@@ -1,0 +1,144 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 37, 27, 0.52);
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.2s ease both;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+.dialog {
+  width: min(520px, 100%);
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 30px 80px rgba(17, 37, 27, 0.3);
+  animation: rise 0.26s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+.dialogHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.dialogEyebrow {
+  margin: 0 0 5px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--brand-green);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: var(--w-semibold);
+  line-height: 1.2;
+  letter-spacing: -0.028em;
+}
+
+.dialogClose {
+  flex: none;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.16s ease;
+}
+
+.dialogClose:hover {
+  border-color: rgba(22, 48, 36, 0.24);
+  color: var(--ink);
+}
+
+.dialogText {
+  margin: 0 0 18px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.dialogList {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.dialogRow {
+  display: flex;
+  gap: 14px;
+  padding: 12px 15px;
+  background: var(--surface);
+}
+
+.dialogRow dt {
+  flex: none;
+  width: 130px;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 2px;
+}
+
+.dialogRow dd {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: var(--w-medium);
+  overflow-wrap: anywhere;
+}
+
+.dialogNote {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: rgba(214, 239, 146, 0.32);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #41611a;
+}
+
+@media (max-width: 440px) {
+  .dialogRow {
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .dialogRow dt {
+    width: auto;
+  }
+}

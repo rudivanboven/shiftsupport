@@ -52,10 +52,10 @@ export default function Hero() {
             </p>
 
             <div className={styles.actions}>
-              <a className={`headingFont ${styles.primaryButton}`} href="#">
+              <a className={`headingFont ${styles.primaryButton}`} href="/retailer/signup">
                 Post a Shift <span aria-hidden="true">→</span>
               </a>
-              <a className={`headingFont ${styles.secondaryButton}`} href="#">
+              <a className={`headingFont ${styles.secondaryButton}`} href="/worker/signup">
                 Find a Shift <span aria-hidden="true">→</span>
               </a>
             </div>

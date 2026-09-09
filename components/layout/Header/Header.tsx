@@ -10,6 +10,8 @@ const mobileLinks = [
   ["How It Works", "/how-it-works"],
   ["For Retailers", "/retailers"],
   ["For Workers", "/workers"],
+  ["Worker Login", "/worker/login"],
+  ["Retailer Login", "/retailer/login"],
 ];
 
 export default function Header() {
@@ -43,6 +45,9 @@ export default function Header() {
           </nav>
 
           <div className={styles.actions}>
+            <a className={`headingFont ${styles.loginLink}`} href="/worker/login">
+              Log in
+            </a>
             <a className={`headingFont ${styles.ghostButton}`} href="/retailers">
               For Retailers <span aria-hidden="true">→</span>
             </a>
@@ -82,6 +87,8 @@ export default function Header() {
           ))}
         </nav>
       </header>
+
+      <div className={styles.mobileCtaSpacer} aria-hidden="true" />
 
       <div className={styles.mobileBottomCta}>
         <a

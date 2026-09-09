@@ -1,10 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
+"use client";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing public Supabase environment variables.");
+import { createBrowserClient } from "@supabase/ssr";
+/**
+ * Browser Supabase client — anon key only.
+ * Reads/writes the auth cookie so the session is shared with the server.
+ */
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
 }
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);

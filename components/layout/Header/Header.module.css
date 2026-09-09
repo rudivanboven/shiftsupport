@@ -78,7 +78,8 @@
 
 .menuButton,
 .mobileMenu,
-.mobileBottomCta {
+.mobileBottomCta,
+.mobileCtaSpacer {
   display: none;
 }
 
@@ -270,6 +271,13 @@
     color: var(--brand-green);
   }
 
+  /* Keeps page content clear of the fixed CTA bar. This used to be
+     padding on <body>, which also pushed the dashboard down. */
+  .mobileCtaSpacer {
+    display: block;
+    height: calc(76px + env(safe-area-inset-bottom));
+  }
+
   .mobileBottomCta {
     position: fixed;
     left: 0;
@@ -303,5 +311,32 @@
   .mobileCtaButton {
     min-height: 46px;
     font-size: 12px;
+  }
+}
+
+/* =========================
+   LOG IN LINK
+   Sits before the two CTAs and leads to the dashboard sign-in screens.
+========================= */
+
+.loginLink {
+  padding: 13px 6px;
+  font-size: 14px;
+  font-weight: var(--w-medium);
+  color: var(--ink);
+  white-space: nowrap;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.loginLink:hover {
+  color: var(--brand-green);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 1120px) {
+  .loginLink {
+    display: none;
   }
 }

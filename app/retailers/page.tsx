@@ -87,8 +87,8 @@ export default function RetailersPage() {
                   <div><strong>$28<span>/hour</span></strong><span>all-in rate</span></div>
                 </div>
                 <div className={styles.heroActions}>
-                  <div><small>New to ShiftSupport?</small><a className={`headingFont ${styles.solidButton}`} href="/contact">Create Retailer Account <span aria-hidden="true">→</span></a></div>
-                  <div><small>Already have an account?</small><a className={`headingFont ${styles.outlineButton}`} href="/contact">Log In <span aria-hidden="true">→</span></a></div>
+                  <div><small>New to ShiftSupport?</small><a className={`headingFont ${styles.solidButton}`} href="/retailer/signup">Create Retailer Account <span aria-hidden="true">→</span></a></div>
+                  <div><small>Already have an account?</small><a className={`headingFont ${styles.outlineButton}`} href="/retailer/login">Log In <span aria-hidden="true">→</span></a></div>
                 </div>
               </div>
               <div className={styles.heroVisual}>
@@ -149,7 +149,7 @@ export default function RetailersPage() {
           <div className={`container ${styles.accountBanner}`}>
             <img src="/images/rr.jpg" alt="Retail employee working inside a local business" />
             <div className={styles.accountOverlay} />
-            <div className={styles.accountCopy}><p className={`headingFont ${styles.accountEyebrow}`}>RETAILER ACCOUNT</p><h2>Ready to Get Help?</h2><p>Create your retailer account, add your business details, and you’ll be ready to post short shifts when you need support.</p><a className={`headingFont ${styles.lightButton}`} href="/contact">Create Retailer Account <span aria-hidden="true">→</span></a></div>
+            <div className={styles.accountCopy}><p className={`headingFont ${styles.accountEyebrow}`}>RETAILER ACCOUNT</p><h2>Ready to Get Help?</h2><p>Create your retailer account, add your business details, and you’ll be ready to post short shifts when you need support.</p><a className={`headingFont ${styles.lightButton}`} href="/retailer/signup">Create Retailer Account <span aria-hidden="true">→</span></a></div>
           </div>
         </section>
 
@@ -172,7 +172,7 @@ export default function RetailersPage() {
         </section>
 
         <section className={styles.finalCta}>
-          <div className={`container ${styles.ctaInner}`}><div><Eyebrow>READY WHEN BUSINESS GETS BUSY</Eyebrow><h2>Need an Extra Pair of Hands?</h2><p>Post a short shift and connect with local workers ready to help.</p></div><div className={styles.ctaActions}><a className={`headingFont ${styles.solidButton}`} href="/contact">Create Retailer Account <span aria-hidden="true">→</span></a><a className={`headingFont ${styles.outlineButton}`} href="/how-it-works">How It Works <span aria-hidden="true">→</span></a></div></div>
+          <div className={`container ${styles.ctaInner}`}><div><Eyebrow>READY WHEN BUSINESS GETS BUSY</Eyebrow><h2>Need an Extra Pair of Hands?</h2><p>Post a short shift and connect with local workers ready to help.</p></div><div className={styles.ctaActions}><a className={`headingFont ${styles.solidButton}`} href="/retailer/signup">Create Retailer Account <span aria-hidden="true">→</span></a><a className={`headingFont ${styles.outlineButton}`} href="/how-it-works">How It Works <span aria-hidden="true">→</span></a></div></div>
         </section>
 
         <Positioning />
