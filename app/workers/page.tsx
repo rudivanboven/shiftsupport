@@ -1,0 +1,34 @@
+import type { ReactNode } from "react";
+import Header from "@/components/layout/Header/Header";
+import Footer from "@/components/layout/Footer/Footer";
+import Positioning from "@/components/home/Positioning/Positioning";
+import WorkerResources from "./WorkerResources";
+import styles from "./page.module.css";
+
+const benefits = [
+  ["/images/ededd.png","WORK AROUND YOUR LIFE","You Choose the Shifts You Work","Browse available shifts and choose the opportunities that fit your schedule. Short shifts give you more flexibility without requiring long-term commitments."],
+  ["/images/ewe.png","CLEAR · SIMPLE · RELIABLE","Get Paid for Your Work","Complete approved shifts and receive payment on the regular ShiftSupport payroll schedule."],
+  ["/images/tg.png","LOCAL OPPORTUNITIES","Local Work, Close to Home","Find opportunities with local businesses in your area. Support neighborhood retailers while earning money through work that fits your availability."],
+];
+const steps = [
+  ["01","profile","Create Your Account","Verify your identity, complete your worker profile, and provide the required employment information."],
+  ["02","search","Browse Available Shifts","See available local shifts and review the location, time, duties, and requirements before applying."],
+  ["03","check","Claim and Work Your Shift","Choose a shift that fits your schedule, arrive prepared, and complete the approved work."],
+  ["04","pay","Get Paid","After the shift is completed and confirmed, payment is processed through ShiftSupport according to the applicable payroll schedule."],
+];
+const icons: Record<string,ReactNode>={profile:<><circle cx="12" cy="8" r="3"/><path d="M6 19a6 6 0 0 1 12 0"/></>,search:<><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 4 4"/></>,check:<><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12 2.2 2.2 4.8-5"/></>,pay:<><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 10h16M8 14h3"/></>};
+function Icon({name}:{name:string}){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[name]}</svg>}
+function Eyebrow({children}:{children:string}){return <p className={`headingFont ${styles.eyebrow}`}><span aria-hidden="true"/>{children}</p>}
+function Checks({items}:{items:string[]}){return <ul className={styles.checks}>{items.map(i=><li key={i}><span>✓</span>{i}</li>)}</ul>}
+function Label({children,className=""}:{children:string;className?:string}){return <span className={`headingFont ${styles.floatingLabel} ${className}`}><span/>{children}</span>}
+
+export default function WorkersPage(){return <><Header/><main className={styles.page}>
+  <section className={styles.hero}><div className="container"><nav className={styles.breadcrumb} aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span>Workers</span></nav><div className={styles.heroGrid}><div className={styles.heroCopy}><Eyebrow>FOR LOCAL WORKERS</Eyebrow><h1>Find <span>Flexible Work</span><br/>That Fits Your Schedule.</h1><p className={styles.lead}>Pick up shifts that fit your life.</p><p>Find short, flexible shifts with local retailers and choose opportunities that work around your school, schedule, and availability.</p><div className={styles.facts}><span>2–4 hour shifts</span><span>Local work</span><span><strong>$20</strong>/hour pay</span></div><div className={styles.actions}><div><small>New to ShiftSupport?</small><a className={styles.solidButton} href="/contact">Create Worker Account →</a></div><div><small>Already have an account?</small><a className={styles.outlineButton} href="/contact">Log In →</a></div></div></div><div className={styles.heroVisual}><img className={styles.mainImage} src="/images/ededd.png" alt="Young local worker ready for a retail shift"/><img className={styles.smallImage} src="/images/ewe.png" alt="Worker using a phone to check local opportunities"/><Label className={styles.labelOne}>LOCAL WORK</Label><Label className={styles.labelTwo}>FLEXIBLE HOURS</Label><Label className={styles.labelThree}>READY TO EARN</Label></div></div></div></section>
+  <section className={styles.benefitsSection}><div className="container"><div className={styles.sectionHeading}><Eyebrow>WHY CHOOSE US</Eyebrow><h2>What Makes <span>ShiftSupport</span> Different.</h2></div><div className={styles.benefitGrid}>{benefits.map(([image,label,title,text])=><article className={styles.benefit} key={title}><img src={image} alt="Local worker opportunity"/><div><p className={styles.itemLabel}>{label}</p><h3>{title}</h3><p>{text}</p></div></article>)}</div></div></section>
+  <section className={styles.stepsSection}><div className="container"><div className={styles.centerHeading}><Eyebrow>SIMPLE FROM SIGN-UP TO PAYDAY</Eyebrow><h2>Four Steps to Earning</h2></div><div className={styles.steps}>{steps.map(([n,icon,title,text])=><article className={styles.step} key={n}><span className={styles.number}>{n}</span><span className={styles.stepIcon}><Icon name={icon}/></span><h3>{title}</h3><p>{text}</p></article>)}</div></div></section>
+  <WorkerResources/>
+  <section className={styles.nearSection}><div className={`container ${styles.nearGrid}`}><div className={styles.nearCopy}><Eyebrow>LOCAL BY DESIGN</Eyebrow><h2>Find <span>Shifts</span> Near You.</h2><h3>Sign up, log in, and see what’s available in your neighborhood.</h3><p>Short shifts can appear in real time with local retailers and businesses.</p><p>Review the opportunity, location, schedule, and duties, then choose the shifts that work for you.</p><Checks items={["Local opportunities","Short flexible shifts","Clear shift details","Work around your availability"]}/><a className={styles.solidButton} href="/contact">Create Worker Account →</a></div><div className={styles.nearVisual}><img src="/images/rrr.jpg" alt="Neighborhood retail environment offering local shifts"/><Label>OPPORTUNITIES NEARBY</Label></div></div></section>
+  <section className={styles.accountSection}><div className={`container ${styles.accountBanner}`}><img src="/images/rr.jpg" alt="Worker helping inside a local shop"/><div className={styles.overlay}/><div className={styles.accountCopy}><p>WORKER ACCOUNT</p><h2>Ready to Start Working?</h2><p>Create your account, verify your identity, complete the required documents, and start exploring local opportunities that fit your schedule.</p><a className={styles.lightButton} href="/contact">Create Worker Account →</a></div></div></section>
+  <section className={styles.finalCta}><div className={`container ${styles.ctaInner}`}><div><Eyebrow>YOUR SCHEDULE, YOUR CHOICE</Eyebrow><h2>Ready to Find Work That Fits Your Life?</h2><p>Create your worker account and start exploring flexible local opportunities.</p></div><a className={styles.solidButton} href="/contact">Create Worker Account →</a></div></section>
+  <Positioning/>
+  </main><Footer/></>}

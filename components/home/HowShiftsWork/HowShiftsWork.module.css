@@ -1,0 +1,433 @@
+/* =========================
+   SECTION
+   Full-bleed brand-green band. `position: relative` only — no overflow
+   clipping anywhere above .intro, which would break its sticky positioning.
+========================= */
+
+.section {
+  position: relative;
+
+  /* The marquee above is rotated -1deg, so its bottom-right corner lifts off
+     this section's straight top edge and exposes a wedge of page background.
+     tan(1deg)/2 ~= 0.0087 of the viewport width, so -1vw closes it at any
+     width. Internal padding below is untouched. */
+  margin-top: -1vw;
+
+  padding: 150px 0 130px;
+  color: #ffffff;
+
+  /* Two soft light-green glows over a diagonal depth band. The band is black
+     at 7% rather than a second green hex, so the only green here is still
+     var(--brand-green). */
+  background:
+    radial-gradient(
+      circle at 18% 24%,
+      rgba(210, 245, 150, 0.2) 0%,
+      rgba(210, 245, 150, 0.08) 22%,
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 88% 74%,
+      rgba(185, 255, 145, 0.18) 0%,
+      rgba(185, 255, 145, 0.06) 24%,
+      transparent 46%
+    ),
+    linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(0, 0, 0, 0.07) 48%,
+      transparent 100%
+    ),
+    var(--brand-green);
+}
+
+/* Decorative arcs live in their own clipped layer, a sibling of the grid,
+   so nothing that wraps the sticky column ever gets overflow: hidden. */
+.decor {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.arcOne,
+.arcTwo {
+  position: absolute;
+  border-radius: 50%;
+}
+
+/* Soft blurred glow, top-right. */
+.arcOne {
+  top: -120px;
+  right: -140px;
+  width: 520px;
+  height: 520px;
+  background: rgba(220, 255, 170, 0.08);
+  filter: blur(10px);
+}
+
+/* Large outlined arc, bottom-left. */
+.arcTwo {
+  left: -160px;
+  bottom: -220px;
+  width: 600px;
+  height: 600px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Small dotted texture, bottom-right only, faded out diagonally so it never
+   reads as a rectangle of dots. */
+.decor::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  height: 260px;
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.22) 1.5px,
+    transparent 1.5px
+  );
+  background-size: 24px 24px;
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(to top left, #000, transparent 72%);
+  mask-image: linear-gradient(to top left, #000, transparent 72%);
+}
+
+.inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 38% 62%;
+  gap: 80px;
+  align-items: start;
+}
+
+/* =========================
+   LEFT — STICKY INTRO
+========================= */
+
+.intro {
+  position: sticky;
+  top: 130px;
+  align-self: start;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+
+.eyebrowLine {
+  width: 32px;
+  height: 2px;
+  flex: 0 0 32px;
+  background: #ffffff;
+}
+
+.heading {
+  margin: 26px 0 0;
+  color: #ffffff;
+  font-size: clamp(64px, 6vw, 96px);
+  font-weight: var(--w-semibold);
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+}
+
+.lede {
+  max-width: 430px;
+  margin: 24px 0 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: clamp(28px, 2.4vw, 36px);
+  font-weight: var(--w-regular);
+  line-height: 1.25;
+}
+
+/* =========================
+   RIGHT — TIMELINE
+   The track is absolutely positioned against the list so it reads as one
+   continuous line; each step reserves the same 2px column beneath it.
+========================= */
+
+.timeline {
+  --num-col: 120px;
+  --track-gap: 38px;
+
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--num-col) + var(--track-gap));
+  width: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.trackFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 1),
+    rgba(255, 255, 255, 0.8)
+  );
+  transition: height 0.6s ease;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: var(--num-col) 2px 1fr;
+  gap: var(--track-gap);
+  align-items: start;
+  min-height: 210px;
+  padding: 28px 0 38px;
+  transition: opacity 0.6s ease;
+}
+
+.timelineJs .step {
+  opacity: 0.55;
+}
+
+.timelineJs .stepActive {
+  opacity: 1;
+}
+
+/* --- number + label --- */
+
+.marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.number {
+  width: 78px;
+  height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--brand-green);
+  font-size: 36px;
+  font-weight: var(--w-semibold);
+  line-height: 1;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  transition:
+    transform 0.6s ease,
+    background-color 0.6s ease,
+    box-shadow 0.6s ease;
+}
+
+.timelineJs .number {
+  background: rgba(255, 255, 255, 0.92);
+  transform: scale(0.92);
+}
+
+.timelineJs .stepActive .number {
+  background: #ffffff;
+  transform: scale(1);
+  box-shadow:
+    0 0 0 8px rgba(255, 255, 255, 0.08),
+    0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.label {
+  margin-top: 8px;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: var(--w-medium);
+  line-height: 1.3;
+}
+
+/* The empty grid cell the track runs through. */
+.spacer {
+  display: block;
+}
+
+/* --- content --- */
+
+.content {
+  padding-bottom: 38px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  transition:
+    transform 0.6s ease,
+    opacity 0.6s ease;
+}
+
+.timelineJs .content {
+  transform: translateY(16px);
+}
+
+.timelineJs .stepActive .content {
+  transform: translateY(0);
+}
+
+.step:last-child .content {
+  border-bottom: none;
+}
+
+.title {
+  margin: 0;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: var(--w-semibold);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.text {
+  max-width: 560px;
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+/* =========================
+   REDUCED MOTION
+   Everything is already rendered in its finished state by the component;
+   here we simply remove the movement and the dimming.
+========================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  .number,
+  .content,
+  .trackFill {
+    transition: none;
+  }
+
+  .step {
+    opacity: 1;
+  }
+
+  .number {
+    transform: none;
+  }
+
+  .content {
+    transform: none;
+  }
+}
+
+/* =========================
+   TABLET
+========================= */
+
+@media (max-width: 991px) {
+  .section {
+    min-height: 0;
+    padding: 80px 0 90px;
+  }
+
+  .inner {
+    grid-template-columns: 1fr;
+    gap: 56px;
+  }
+
+  .intro {
+    position: static;
+    top: auto;
+  }
+
+  .heading {
+    font-size: clamp(64px, 9vw, 72px);
+  }
+
+  .step {
+    min-height: 0;
+    padding: 24px 0 32px;
+  }
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 767px) {
+  .section {
+    padding: 70px 0;
+  }
+
+  .heading {
+    font-size: clamp(47px, 12vw, 53px);
+  }
+
+  .lede {
+    font-size: 24px;
+  }
+
+  .timeline {
+    --num-col: 72px;
+    --track-gap: 20px;
+  }
+
+  .number {
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+  }
+
+  .stepActive .number {
+    box-shadow:
+      0 0 0 6px rgba(255, 255, 255, 0.08),
+      0 10px 30px rgba(0, 0, 0, 0.12);
+  }
+
+  .label {
+    font-size: 14px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .text {
+    font-size: 15px;
+  }
+}
+
+/* =========================
+   SMALL MOBILE
+========================= */
+
+@media (max-width: 480px) {
+  .heading {
+    font-size: clamp(41px, 13vw, 45px);
+  }
+
+  .timeline {
+    --num-col: 60px;
+    --track-gap: 16px;
+  }
+
+  .number {
+    width: 50px;
+    height: 50px;
+    font-size: 21px;
+  }
+
+  .content {
+    min-width: 0;
+  }
+}

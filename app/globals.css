@@ -1,0 +1,359 @@
+:root {
+  --bg: #f4f0e8;
+  --surface: #fffdf8;
+  --ink: #163024;
+  --muted: #6e786f;
+  /* The one brand green. Every primary green element — text, icons,
+     borders, buttons, accents — resolves to this. Darker/lighter states
+     are derived with filter/opacity, never a second hue. */
+  --brand-green: #2e7b3c;
+  --brand-green-tint: rgba(46, 123, 60, 0.12);
+  --brand-green-shadow: rgba(46, 123, 60, 0.18);
+
+  /* Lime is a separate secondary accent (yellow-green), not a brand green. */
+  --lime: #d6ef92;
+  --peach: #f4c5a7;
+  --line: rgba(22, 48, 36, 0.12);
+  --shadow: 0 20px 60px rgba(22, 48, 36, 0.12);
+
+  /* Desktop header height, shared with the hero's viewport calc. */
+  --header-h: 90px;
+
+  /* Montserrat is loaded and self-hosted by next/font in app/layout.tsx;
+     the literal name + system stack are fallbacks only. Arial is a system
+     font, so the body stack needs no loading. */
+  --font-heading:
+    var(--font-montserrat), "Montserrat", "Helvetica Neue", Arial, sans-serif;
+  --font-body: Arial, Helvetica, sans-serif;
+
+  /* Weight scale — deliberately stops at 600. Nothing in the UI should
+     use 700/800/900: that is what made the old type feel heavy. */
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+
+  background:
+    radial-gradient(
+      circle at 0% 10%,
+      rgba(214, 239, 146, 0.28),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 95% 30%,
+      rgba(244, 197, 167, 0.24),
+      transparent 32%
+    ),
+    var(--bg);
+
+  font-family: var(--font-body);
+  font-weight: var(--w-regular);
+}
+
+/* =========================
+   GLOBAL TYPOGRAPHY
+
+   The single source of truth for fonts across the whole app:
+
+     Headings          Montserrat, max weight 600
+     Body / paragraphs Arial, weight 400
+     UI text           Montserrat (ul, li, a, nav, buttons, labels)
+
+   Every current and future page/section inherits from here — section
+   CSS modules should not declare font-family, and should never reach
+   for a weight above 600.
+========================= */
+
+/* Form controls inherit size/line-height, then get a family below. */
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* --- BODY TEXT — Arial 400 --- */
+
+/* (span/small/em deliberately omitted — they inherit, so an inline
+   element nested inside a heading keeps the heading font.) */
+p,
+blockquote,
+dd,
+figcaption,
+td,
+caption,
+input,
+textarea,
+select,
+optgroup,
+option,
+.sectionText {
+  font-family: var(--font-body);
+  font-weight: var(--w-regular);
+}
+
+/* --- HEADINGS — Montserrat, capped at 600 --- */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.sectionTitle {
+  font-family: var(--font-heading);
+}
+
+h1,
+h2,
+h3,
+h4,
+.sectionTitle {
+  font-weight: var(--w-semibold);
+}
+
+h5,
+h6 {
+  font-weight: var(--w-medium);
+}
+
+/* --- UI TEXT — Montserrat (nav, links, lists, buttons, labels) --- */
+
+ul,
+ol,
+li,
+dt,
+a,
+nav,
+button,
+label,
+summary,
+th,
+legend,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.eyebrow,
+.headingFont,
+.headingFont strong,
+.headingFont b {
+  font-family: var(--font-heading);
+}
+
+/* Navigation, links and list items sit at 500 — present, not shouty. */
+li,
+dt,
+a,
+nav,
+nav a {
+  font-weight: var(--w-medium);
+}
+
+/* Buttons and small labels sit at 600. */
+button,
+label,
+summary,
+th,
+legend,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.eyebrow {
+  font-weight: var(--w-semibold);
+}
+
+/* <strong>/<b> are used throughout as card sub-headings and lead-ins:
+   Montserrat 600 rather than the browser default bold (700). */
+strong,
+b {
+  font-family: var(--font-heading);
+  font-weight: var(--w-semibold);
+}
+
+/* ...but genuine inline emphasis inside running body copy stays in Arial. */
+p strong,
+p b,
+blockquote strong,
+blockquote b,
+.sectionText strong,
+.sectionText b {
+  font-family: var(--font-body);
+}
+
+/* Escape hatch for the rare element that needs the body font back. */
+.bodyFont {
+  font-family: var(--font-body);
+}
+
+/* =========================
+   LINKS + BUTTONS
+========================= */
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* =========================
+   GLOBAL CONTAINER
+========================= */
+
+.container {
+  width: min(1290px, calc(100% - 30px));
+  margin-inline: auto;
+  padding-inline: 15px;
+}
+
+/* =========================
+   GLOBAL SECTION
+========================= */
+
+.section {
+  padding: 96px 0;
+}
+
+/* =========================
+   EYEBROW
+========================= */
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-bottom: 18px;
+
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+
+  color: var(--brand-green);
+}
+
+.eyebrow::before {
+  content: "";
+
+  width: 34px;
+  height: 2px;
+
+  border-radius: 10px;
+
+  background: currentColor;
+}
+
+/* =========================
+   SECTION TITLE
+========================= */
+
+.sectionTitle {
+  margin: 0;
+
+  max-width: 900px;
+
+  font-size: clamp(30px, 4.2vw, 66px);
+
+  font-weight: var(--w-semibold);
+
+  line-height: 0.98;
+
+  letter-spacing: -0.05em;
+}
+
+/* =========================
+   SECTION TEXT
+========================= */
+
+.sectionText {
+  max-width: 720px;
+
+  margin-top: 22px;
+
+  font-size: 18px;
+  font-weight: var(--w-regular);
+
+  line-height: 1.7;
+
+  color: var(--muted);
+}
+
+/* =========================
+   IMAGE PLACEHOLDER
+========================= */
+
+.imagePlaceholder {
+  min-height: 280px;
+
+  display: grid;
+
+  place-items: center;
+
+  padding: 30px;
+
+  border: 1px dashed rgba(22, 48, 36, 0.3);
+
+  border-radius: 28px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(214, 239, 146, 0.4),
+      rgba(244, 197, 167, 0.35)
+    ),
+    var(--surface);
+
+  color: rgba(22, 48, 36, 0.55);
+
+  font-weight: var(--w-medium);
+
+  text-align: center;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 940px) {
+  body {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 767px) {
+  h1 {
+    font-size: calc(2.5rem - 5px);
+  }
+
+  h2,
+  .sectionTitle {
+    font-size: clamp(33px, calc(5.2vw - 5px), 71px);
+  }
+
+  h3 {
+    font-size: calc(1.17em - 4px);
+  }
+
+  .section {
+    padding: 68px 0;
+  }
+
+  .sectionText {
+    font-size: 16px;
+  }
+}

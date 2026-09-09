@@ -1,0 +1,307 @@
+/* Sticky implementation unchanged: position/top/z-index exactly as before. */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.inner {
+  min-height: var(--header-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+/* =========================
+   LOGO
+========================= */
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.logo:hover {
+  transform: translateY(-1px) scale(1.015);
+  opacity: 0.92;
+}
+
+.logoImage {
+  width: 215px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 35px;
+  font-size: 15px;
+  font-weight: var(--w-medium);
+  line-height: 1.2;
+}
+
+.nav a {
+  color: var(--ink);
+  white-space: nowrap;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.nav a:hover {
+  color: var(--brand-green);
+  transform: translateY(-1px);
+}
+
+/* =========================
+   CTA BUTTONS
+========================= */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuButton,
+.mobileMenu,
+.mobileBottomCta {
+  display: none;
+}
+
+.ghostButton,
+.solidButton {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 13px 27px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: var(--w-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease,
+    opacity 0.25s ease,
+    filter 0.25s ease;
+}
+
+.ghostButton {
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid #d7d7d7;
+}
+
+.ghostButton:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+  transform: translateY(-2px);
+}
+
+.solidButton {
+  color: #ffffff;
+  background: var(--brand-green);
+  border: 1px solid var(--brand-green);
+}
+
+.solidButton:hover {
+  filter: brightness(0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--brand-green-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .nav a,
+  .ghostButton,
+  .solidButton,
+  .menuButton,
+  .mobileMenu {
+    transition: none;
+  }
+
+  .logo:hover,
+  .nav a:hover,
+  .ghostButton:hover,
+  .solidButton:hover {
+    transform: none;
+  }
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 1150px) {
+  .inner {
+    gap: 20px;
+  }
+
+  .nav {
+    gap: 26px;
+    font-size: 14px;
+  }
+
+  .ghostButton,
+  .solidButton {
+    padding: 12px 20px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 940px) {
+  .inner {
+    min-height: 72px;
+    flex-wrap: nowrap;
+    gap: 16px;
+  }
+
+  .nav,
+  .actions {
+    display: none;
+  }
+
+  .logoImage {
+    width: 170px;
+  }
+
+  .menuButton {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink);
+    background: #ffffff;
+    cursor: pointer;
+    transition:
+      background-color 0.25s ease,
+      border-color 0.25s ease,
+      color 0.25s ease;
+  }
+
+  .menuButton:hover,
+  .menuOpen {
+    color: var(--brand-green);
+    border-color: var(--brand-green);
+    background: rgba(46, 123, 60, 0.06);
+  }
+
+  .menuButton span {
+    width: 18px;
+    height: 2px;
+    display: block;
+    border-radius: 999px;
+    background: currentColor;
+    transition:
+      transform 0.25s ease,
+      opacity 0.25s ease;
+  }
+
+  .menuOpen span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+
+  .menuOpen span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .menuOpen span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  .mobileMenu {
+    width: min(1290px, calc(100% - 30px));
+    max-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+    margin-inline: auto;
+    padding: 0 15px;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      max-height 0.28s ease,
+      opacity 0.22s ease,
+      padding-bottom 0.28s ease;
+  }
+
+  .mobileMenuOpen {
+    max-height: 340px;
+    padding-bottom: 18px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobileMenu a {
+    padding: 13px 0;
+    border-top: 1px solid rgba(22, 48, 36, 0.08);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.2;
+  }
+
+  .mobileMenu a:hover {
+    color: var(--brand-green);
+  }
+
+  .mobileBottomCta {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    z-index: 80;
+    width: 100%;
+    display: flex;
+    gap: 10px;
+    padding: 10px 15px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid rgba(22, 48, 36, 0.12);
+    box-shadow: 0 -12px 30px rgba(22, 48, 36, 0.1);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .mobileCtaButton {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 48px;
+    padding: 13px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 560px) {
+  .logoImage {
+    width: 160px;
+  }
+
+  .mobileCtaButton {
+    min-height: 46px;
+    font-size: 12px;
+  }
+}

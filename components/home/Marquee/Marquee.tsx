@@ -1,0 +1,1 @@
+import styles from "./Marquee.module.css"; export default function Marquee(){const line="Flexible Staffing · Local Workers · Reliable Support · ";return <section className={styles.wrap}><div className={styles.track}><span className="headingFont">{line}{line}{line}</span><span className="headingFont" aria-hidden="true">{line}{line}{line}</span></div></section>}

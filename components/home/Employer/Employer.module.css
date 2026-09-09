@@ -1,0 +1,889 @@
+/* =========================
+   SECTION
+========================= */
+
+.section {
+  position: relative;
+  overflow: hidden;
+  padding: 110px 0 118px;
+  background: #ffffff;
+}
+
+.inner {
+  position: relative;
+  z-index: 2;
+}
+
+/* =========================
+   BACKGROUND GRAPHICS
+========================= */
+
+.decor {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  color: rgba(46, 123, 60, 0.28);
+  pointer-events: none;
+}
+
+.centreGlow {
+  position: absolute;
+  border-radius: 50%;
+  top: 46%;
+  left: 50%;
+  width: 700px;
+  height: 420px;
+  margin-left: -350px;
+  background: rgba(46, 123, 60, 0.05);
+  filter: blur(28px);
+}
+
+.curve {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  width: 1240px;
+  max-width: none;
+  height: auto;
+  margin-left: -620px;
+  opacity: 0.55;
+  animation: dash 34s linear infinite;
+}
+
+/* --- scattered soft-green circles ---
+   Each carries its own size, tint and animation cycle, so nothing moves in
+   lockstep. All of them sit in the z-index:1 decor layer, behind content. */
+
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(46, 123, 60, 0.08);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+/* left cluster */
+.lc1 {
+  top: 33%;
+  left: 1%;
+  width: 148px;
+  height: 148px;
+  background: rgba(46, 123, 60, 0.07);
+  animation-name: bubbleA;
+  animation-duration: 9s;
+}
+
+.lc2 {
+  top: 25%;
+  left: 8.5%;
+  width: 60px;
+  height: 60px;
+  background: rgba(46, 123, 60, 0.1);
+  animation-name: bubbleB;
+  animation-duration: 7s;
+}
+
+.lc3 {
+  top: 51%;
+  left: 8%;
+  width: 26px;
+  height: 26px;
+  background: rgba(46, 123, 60, 0.14);
+  animation-name: bubbleC;
+  animation-duration: 5s;
+}
+
+.lc4 {
+  top: 46%;
+  left: 0.2%;
+  width: 15px;
+  height: 15px;
+  background: rgba(46, 123, 60, 0.16);
+  animation-name: bubbleD;
+  animation-duration: 6s;
+}
+
+/* right cluster */
+.rc1 {
+  right: 1%;
+  bottom: 22%;
+  width: 158px;
+  height: 158px;
+  background: rgba(46, 123, 60, 0.07);
+  animation-name: bubbleC;
+  animation-duration: 10s;
+}
+
+.rc2 {
+  right: 8.5%;
+  bottom: 33%;
+  width: 66px;
+  height: 66px;
+  background: rgba(46, 123, 60, 0.1);
+  animation-name: bubbleA;
+  animation-duration: 7.5s;
+}
+
+.rc3 {
+  right: 7.5%;
+  bottom: 17%;
+  width: 28px;
+  height: 28px;
+  background: rgba(46, 123, 60, 0.14);
+  animation-name: bubbleD;
+  animation-duration: 6.5s;
+}
+
+.rc4 {
+  right: 0.6%;
+  bottom: 36%;
+  width: 16px;
+  height: 16px;
+  background: rgba(46, 123, 60, 0.16);
+  animation-name: bubbleB;
+  animation-duration: 5.5s;
+}
+
+/* top-right cluster, level with the marquee above */
+.tc1 {
+  top: 6%;
+  right: 4%;
+  width: 96px;
+  height: 96px;
+  background: rgba(46, 123, 60, 0.07);
+  animation-name: bubbleB;
+  animation-duration: 8.5s;
+}
+
+.tc2 {
+  top: 15%;
+  right: 11%;
+  width: 44px;
+  height: 44px;
+  background: rgba(46, 123, 60, 0.1);
+  animation-name: bubbleC;
+  animation-duration: 6.8s;
+}
+
+.tc3 {
+  top: 4%;
+  right: 12.5%;
+  width: 22px;
+  height: 22px;
+  background: rgba(46, 123, 60, 0.14);
+  animation-name: bubbleA;
+  animation-duration: 5.4s;
+}
+
+.tc4 {
+  top: 13%;
+  right: 1.5%;
+  width: 13px;
+  height: 13px;
+  background: rgba(46, 123, 60, 0.16);
+  animation-name: bubbleD;
+  animation-duration: 7.2s;
+}
+
+/* --- small line accents beside the circles --- */
+
+.markCross,
+.markLines {
+  position: absolute;
+  opacity: 0.45;
+  transform: rotate(var(--r, 0deg));
+  animation: markDrift var(--d, 7s) ease-in-out infinite alternate;
+}
+
+.markCross {
+  width: 14px;
+  height: 14px;
+  background:
+    linear-gradient(currentColor, currentColor) center/100% 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) center/1.5px 100% no-repeat;
+}
+
+.markLines {
+  width: 17px;
+  height: 12px;
+  background: repeating-linear-gradient(
+    to bottom,
+    currentColor 0 1.5px,
+    transparent 1.5px 5px
+  );
+}
+
+.lm1 {
+  --r: 16deg;
+  --d: 6.4s;
+  top: 28%;
+  left: 5.5%;
+}
+
+.lm2 {
+  --r: -10deg;
+  --d: 8.2s;
+  top: 47%;
+  left: 12%;
+}
+
+.rm1 {
+  --r: 12deg;
+  --d: 7.6s;
+  right: 12.5%;
+  bottom: 28%;
+}
+
+.rm2 {
+  --r: -18deg;
+  --d: 5.8s;
+  right: 4.5%;
+  bottom: 14%;
+}
+
+.tm1 {
+  --r: 22deg;
+  --d: 6.9s;
+  top: 3.5%;
+  right: 9%;
+}
+
+.tm2 {
+  --r: -14deg;
+  --d: 8.6s;
+  top: 16%;
+  right: 6.5%;
+}
+
+/* =========================
+   CENTRED INTRO
+========================= */
+
+.intro {
+  max-width: 760px;
+  margin-inline: auto;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+
+.inView .intro {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: var(--brand-green);
+  font-size: 12px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.eyebrowLine {
+  width: 26px;
+  height: 2px;
+  flex: 0 0 26px;
+  background: var(--brand-green);
+}
+
+.heading {
+  margin: 20px 0 0;
+  color: #151a16;
+  font-size: clamp(44px, 4.2vw, 62px);
+  font-weight: var(--w-semibold);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+
+.accent {
+  color: var(--brand-green);
+}
+
+.statement {
+  margin: 20px 0 0;
+  color: #151515;
+  font-size: 23px;
+  font-weight: var(--w-semibold);
+  line-height: 1.3;
+}
+
+.description {
+  max-width: 620px;
+  margin: 12px auto 0;
+  color: #667068;
+  font-size: 16px;
+  font-weight: var(--w-regular);
+  line-height: 1.7;
+}
+
+/* =========================
+   IMAGE COMPOSITION
+========================= */
+
+.composition {
+  display: grid;
+  grid-template-columns: 0.8fr 1.5fr 0.8fr;
+  gap: 22px;
+  align-items: center;
+  margin-top: 64px;
+}
+
+.sideWrap,
+.centreWrap {
+  position: relative;
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s ease;
+}
+
+.centreWrap {
+  transition-delay: 0.08s;
+}
+
+.rightWrap {
+  transition-delay: 0.16s;
+}
+
+.inView .sideWrap,
+.inView .centreWrap {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* float lives on the wrapper so it never fights the card's rotation */
+.inView .leftWrap {
+  animation: floatA 9s ease-in-out infinite 0.7s;
+}
+
+.inView .rightWrap {
+  animation: floatB 10.5s ease-in-out infinite 0.7s;
+}
+
+.side,
+.centre {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #eef1ee;
+  box-shadow: 0 22px 55px rgba(20, 45, 25, 0.14);
+  transition: transform 0.5s ease;
+}
+
+.side {
+  height: 380px;
+}
+
+.centre {
+  height: 470px;
+  border-radius: 28px;
+}
+
+.tiltLeft {
+  transform: rotate(-2.2deg);
+}
+
+.tiltRight {
+  transform: rotate(2.2deg);
+}
+
+.tiltLeft:hover {
+  transform: rotate(-2.2deg) scale(1.015);
+}
+
+.tiltRight:hover {
+  transform: rotate(2.2deg) scale(1.015);
+}
+
+.centre:hover {
+  transform: scale(1.012);
+}
+
+.img {
+  object-fit: cover;
+}
+
+/* --- floating pills (outside the tilted card, so they stay upright) --- */
+
+.pill {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 20px);
+  margin: 0;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 26px rgba(15, 30, 20, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #181c19;
+  font-size: 10px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--brand-green);
+}
+
+.pillLeft {
+  left: 10px;
+  bottom: 22px;
+  max-width: 172px;
+  animation: floatB 8s ease-in-out infinite;
+}
+
+.pillRight {
+  right: 10px;
+  bottom: 22px;
+  max-width: 160px;
+  animation: floatA 8.8s ease-in-out infinite;
+}
+
+.pillTop {
+  top: 20px;
+  right: 20px;
+  white-space: nowrap;
+  animation: floatA 7.4s ease-in-out infinite;
+}
+
+.pillBottom {
+  left: 20px;
+  bottom: 22px;
+  max-width: 210px;
+  animation: floatB 9.4s ease-in-out infinite;
+}
+
+/* =========================
+   FOUR BENEFITS — one row, hairline separators
+========================= */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 72px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  padding: 4px 26px;
+  border-left: 1px solid #e7ece7;
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.feature:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+.feature:last-child {
+  padding-right: 0;
+}
+
+.inView .feature {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.inView .feature:nth-child(2) {
+  transition-delay: 0.07s;
+}
+
+.inView .feature:nth-child(3) {
+  transition-delay: 0.14s;
+}
+
+.inView .feature:nth-child(4) {
+  transition-delay: 0.21s;
+}
+
+.featureHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.featureIcon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(46, 123, 60, 0.1);
+  color: var(--brand-green);
+  transition: transform 0.3s ease;
+}
+
+.featureIcon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.feature:hover .featureIcon {
+  transform: scale(1.05);
+}
+
+.featureTitle {
+  margin: 0;
+  color: #171a18;
+  font-size: 18px;
+  font-weight: var(--w-semibold);
+  line-height: 1.3;
+}
+
+.featureText {
+  margin: 12px 0 0;
+  color: #667068;
+  font-size: 16px;
+  font-weight: var(--w-regular);
+  line-height: 1.6;
+}
+
+/* =========================
+   CLOSING NOTE
+========================= */
+
+.note {
+  /* spans the same container as the four feature items above */
+  margin: 40px 0 0;
+  padding: 24px 30px;
+  border: 1px solid rgba(46, 123, 60, 0.12);
+  border-radius: 16px;
+  background: rgba(46, 123, 60, 0.06);
+  color: #667068;
+  font-size: 17px;
+  font-weight: var(--w-regular);
+  line-height: 1.6;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.5s ease 0.28s,
+    transform 0.5s ease 0.28s;
+}
+
+.inView .note {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.noteLead {
+  color: #171a18;
+  font-weight: var(--w-semibold);
+}
+
+/* =========================
+   MOTION
+========================= */
+
+@keyframes floatA {
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes floatB {
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -340;
+  }
+}
+
+@keyframes bubbleA {
+  to {
+    transform: translate(7px, -11px) scale(1.13);
+  }
+}
+
+@keyframes bubbleB {
+  to {
+    transform: translate(-9px, 8px) scale(0.88);
+  }
+}
+
+@keyframes bubbleC {
+  to {
+    transform: translate(9px, 7px) scale(1.17);
+  }
+}
+
+@keyframes bubbleD {
+  to {
+    transform: translate(-6px, -9px) scale(0.86);
+  }
+}
+
+@keyframes markDrift {
+  to {
+    opacity: 0.75;
+    transform: rotate(var(--r, 0deg)) scale(1.16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro,
+  .sideWrap,
+  .centreWrap,
+  .feature,
+  .note {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .inView .leftWrap,
+  .inView .rightWrap,
+  .pill,
+  .curve,
+  .circle,
+  .markCross,
+  .markLines {
+    animation: none;
+  }
+
+  .side,
+  .centre,
+  .featureIcon {
+    transition: none;
+  }
+
+  .centre:hover,
+  .feature:hover .featureIcon {
+    transform: none;
+  }
+
+  .tiltLeft:hover {
+    transform: rotate(-2.2deg);
+  }
+
+  .tiltRight:hover {
+    transform: rotate(2.2deg);
+  }
+}
+
+/* =========================
+   TABLET
+========================= */
+
+@media (max-width: 1150px) {
+  .composition {
+    gap: 16px;
+  }
+
+  .side {
+    height: 320px;
+  }
+
+  .centre {
+    height: 400px;
+  }
+
+  .features {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 30px;
+  }
+
+  .feature {
+    padding: 4px 22px;
+  }
+
+  .feature:nth-child(odd) {
+    padding-left: 0;
+    border-left: none;
+  }
+
+  .feature:nth-child(even) {
+    padding-right: 0;
+  }
+}
+
+/* =========================
+   STACKED
+========================= */
+
+@media (max-width: 991px) {
+  .section {
+    padding: 85px 0 90px;
+  }
+
+  .composition {
+    grid-template-columns: 1fr;
+    gap: 26px;
+    max-width: 640px;
+    margin-inline: auto;
+  }
+
+  /* rotation and float read as noise once the cards are stacked */
+  .tiltLeft,
+  .tiltRight,
+  .tiltLeft:hover,
+  .tiltRight:hover {
+    transform: none;
+  }
+
+  .inView .leftWrap,
+  .inView .rightWrap {
+    animation: none;
+  }
+
+  .side {
+    height: 300px;
+  }
+
+  .centre {
+    height: 360px;
+  }
+
+  .curve,
+  .lc4,
+  .rc4,
+  .tc3,
+  .tc4,
+  .lm2,
+  .rm2,
+  .tm2 {
+    display: none;
+  }
+
+  /* fewer, smaller decorations once the layout stacks */
+  .lc1,
+  .rc1 {
+    width: 96px;
+    height: 96px;
+  }
+
+  .tc1 {
+    width: 70px;
+    height: 70px;
+  }
+
+  .lc2,
+  .rc2 {
+    width: 42px;
+    height: 42px;
+  }
+
+  .features {
+    margin-top: 54px;
+  }
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 767px) {
+  .section {
+    padding: 72px 0 78px;
+  }
+
+  .decor {
+    display: none;
+  }
+
+  .heading {
+    font-size: clamp(31px, 10vw, 39px);
+  }
+
+  .statement {
+    font-size: 20px;
+  }
+
+  .description {
+    font-size: 15px;
+  }
+
+  .side {
+    height: 260px;
+  }
+
+  .centre {
+    height: 300px;
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+    row-gap: 0;
+  }
+
+  .feature,
+  .feature:nth-child(odd),
+  .feature:nth-child(even) {
+    padding: 0;
+    border-left: none;
+  }
+
+  .feature + .feature {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(46, 123, 60, 0.14);
+  }
+
+  .featureTitle {
+    font-size: 14px;
+  }
+}
+
+/* =========================
+   SMALL MOBILE — down to 320px
+========================= */
+
+@media (max-width: 400px) {
+  .heading {
+    font-size: 29px;
+  }
+
+  .side,
+  .centre {
+    height: 230px;
+  }
+
+  .pill {
+    font-size: 9px;
+    padding: 8px 11px;
+  }
+
+  .pillLeft,
+  .pillRight,
+  .pillBottom {
+    max-width: calc(100% - 24px);
+  }
+
+  .note {
+    padding: 18px 18px;
+    font-size: 16px;
+  }
+}

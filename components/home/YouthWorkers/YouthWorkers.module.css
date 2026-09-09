@@ -1,0 +1,439 @@
+/* =========================
+   SECTION
+========================= */
+
+.section {
+  position: relative;
+  overflow: hidden;
+  padding: 105px 0 110px;
+  background: #ffffff;
+}
+
+.inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40% 1fr;
+  gap: 56px;
+  align-items: center;
+}
+
+/* =========================
+   LEFT COLUMN
+========================= */
+
+.intro {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+
+.inView .intro {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: var(--brand-green);
+  font-size: 12px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.eyebrowLine {
+  width: 28px;
+  height: 2px;
+  flex: 0 0 28px;
+  background: var(--brand-green);
+}
+
+.heading {
+  margin: 22px 0 0;
+  color: #151a16;
+  font-size: clamp(40px, 3.4vw, 52px);
+  font-weight: var(--w-semibold);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.accent {
+  color: var(--brand-green);
+}
+
+.subheading {
+  margin: 18px 0 0;
+  color: #232823;
+  font-size: 18px;
+  font-weight: var(--w-medium);
+  line-height: 1.4;
+}
+
+.description {
+  margin: 12px 0 0;
+  color: #667068;
+  font-size: 16px;
+  font-weight: var(--w-regular);
+  line-height: 1.7;
+}
+
+.highlight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 26px 0 0;
+  padding: 16px 20px;
+  border: 1px solid rgba(46, 123, 60, 0.14);
+  border-radius: 16px;
+  background: rgba(46, 123, 60, 0.07);
+  color: #171a18;
+  font-size: 16px;
+  font-weight: var(--w-medium);
+  line-height: 1.45;
+}
+
+.highlightIcon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--brand-green);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(46, 123, 60, 0.22);
+}
+
+.highlightIcon svg {
+  width: 21px;
+  height: 21px;
+}
+
+/* =========================
+   RIGHT — THREE SIMPLE CARDS
+========================= */
+
+.visual {
+  position: relative;
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s ease 0.1s,
+    transform 0.7s ease 0.1s;
+}
+
+.inView .visual {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* The only decoration: one slow, very light green glow behind the cards. */
+.blob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 560px;
+  height: 560px;
+  max-width: 130%;
+  margin: -280px 0 0 -280px;
+  border-radius: 50%;
+  background: rgba(46, 123, 60, 0.06);
+  filter: blur(20px);
+  animation: drift 22s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.cards {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 22px 26px;
+  border: 1px solid #e7ece7;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(20, 45, 25, 0.06);
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(46, 123, 60, 0.2);
+  box-shadow: 0 18px 40px rgba(20, 45, 25, 0.1);
+}
+
+.cardIcon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(46, 123, 60, 0.09);
+  color: var(--brand-green);
+}
+
+.cardIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.cardTitle {
+  margin: 18px 0 0;
+  color: #151a16;
+  font-size: 16px;
+  font-weight: var(--w-semibold);
+  line-height: 1.35;
+}
+
+.cardText {
+  margin: 8px 0 0;
+  color: #667068;
+  font-size: 14px;
+  font-weight: var(--w-regular);
+  line-height: 1.6;
+}
+
+/* =========================
+   BOTTOM CTA — part of the same section
+========================= */
+
+.ctaWrap {
+  margin-top: 54px;
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s ease 0.24s,
+    transform 0.6s ease 0.24s;
+}
+
+.inView .ctaWrap {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cta {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 26px 30px;
+  border: 1px solid rgba(46, 123, 60, 0.13);
+  border-radius: 24px;
+  background: rgba(46, 123, 60, 0.06);
+}
+
+.ctaIcon {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 17px;
+  background: #ffffff;
+  color: var(--brand-green);
+  box-shadow: 0 10px 24px rgba(20, 45, 25, 0.07);
+}
+
+.ctaIcon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.ctaBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ctaTitle {
+  margin: 0;
+  color: #151a16;
+  font-size: 19px;
+  font-weight: var(--w-semibold);
+  line-height: 1.35;
+}
+
+.ctaText {
+  margin: 5px 0 0;
+  color: #667068;
+  font-size: 15px;
+  font-weight: var(--w-regular);
+  line-height: 1.55;
+}
+
+.ctaButton {
+  flex: 0 0 auto;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 13px 24px;
+  border: 1px solid var(--brand-green);
+  border-radius: 999px;
+  background: var(--brand-green);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: var(--w-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    filter 0.25s ease;
+}
+
+.ctaButton:hover {
+  transform: translateY(-2px);
+  filter: brightness(0.95);
+  box-shadow: 0 10px 24px var(--brand-green-shadow);
+}
+
+/* =========================
+   MOTION
+========================= */
+
+@keyframes drift {
+  50% {
+    transform: translate(18px, -14px) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro,
+  .visual,
+  .ctaWrap {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .blob {
+    animation: none;
+  }
+
+  .card,
+  .ctaButton {
+    transition: none;
+  }
+
+  .card:hover,
+  .ctaButton:hover {
+    transform: none;
+  }
+}
+
+/* =========================
+   TABLET
+========================= */
+
+@media (max-width: 1150px) {
+  .inner {
+    grid-template-columns: 38% 1fr;
+    gap: 40px;
+  }
+
+  .cards {
+    gap: 12px;
+  }
+
+  .card {
+    padding: 20px 18px 22px;
+  }
+}
+
+/* =========================
+   STACKED — cards move below the copy
+========================= */
+
+@media (max-width: 991px) {
+  .section {
+    padding: 82px 0 88px;
+  }
+
+  .inner {
+    grid-template-columns: 1fr;
+    gap: 44px;
+  }
+
+  .cards {
+    gap: 16px;
+  }
+
+  .card {
+    padding: 24px 22px 26px;
+  }
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 767px) {
+  .section {
+    padding: 70px 0 74px;
+  }
+
+  .heading {
+    font-size: clamp(29px, 9.5vw, 37px);
+  }
+
+  .subheading {
+    font-size: 17px;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .cta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 22px;
+  }
+
+  .ctaButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* =========================
+   SMALL MOBILE — down to 320px
+========================= */
+
+@media (max-width: 400px) {
+  .heading {
+    font-size: 27px;
+  }
+
+  .highlight {
+    gap: 12px;
+    padding: 14px 16px;
+    font-size: 15px;
+  }
+
+  .card {
+    padding: 20px 18px;
+  }
+
+  .ctaTitle {
+    font-size: 13px;
+  }
+}
