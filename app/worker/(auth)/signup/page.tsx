@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import AuthLayout from "@/components/auth/AuthLayout";
+import { redirectIfSignedIn } from "@/lib/auth/session";
 import WorkerSignupForm from "./SignupForm";
 
 export const metadata: Metadata = {
   title: "Create a worker account | ShiftSupport",
 };
 
-export default function WorkerSignupPage() {
+export default async function WorkerSignupPage() {
+  // A signed-in user never needs the signup form.
+  await redirectIfSignedIn();
+
   return (
     <AuthLayout
       badge="For workers"

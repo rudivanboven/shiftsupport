@@ -49,7 +49,7 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 19px 20px 0;
+  padding: 32px 20px 0;
 }
 
 .headText {
@@ -173,31 +173,71 @@
 
 .foot {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
   margin-top: auto;
-  padding: 16px 20px;
+  padding: 14px 20px 18px;
 }
 
-.pay {
+/* ---- estimated total panel ---- */
+
+.total {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--brand-green-shadow);
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    rgba(46, 123, 60, 0.05),
+    rgba(244, 240, 232, 0.5)
+  );
+}
+
+.totalIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--brand-green);
+  color: #fff;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: var(--w-semibold);
+  line-height: 1;
+}
+
+.totalText {
   min-width: 0;
 }
 
-.payValue {
+.totalValue {
   display: block;
   font-family: var(--font-heading);
-  font-size: 19px;
+  font-size: 22px;
   font-weight: var(--w-semibold);
-  letter-spacing: -0.028em;
-  color: var(--brand-green);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #1c5427;
 }
 
-.payLabel {
+.totalLabel {
   display: block;
-  margin-top: 1px;
+  margin-top: 2px;
   font-size: 11.5px;
+  line-height: 1.4;
   color: var(--muted);
+}
+
+.footRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 
 .footActions {
@@ -228,13 +268,35 @@
 }
 
 .note {
-  margin: 0 20px 16px;
-  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 14px 20px 0;
+  padding: 15px;
+  border: 1px solid transparent;
   border-radius: 14px;
   background: rgba(22, 48, 36, 0.04);
   font-size: 13px;
   line-height: 1.55;
   color: var(--muted);
+}
+
+.noteText {
+  margin: 0;
+  min-width: 0;
+}
+
+.noteIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+/* Not selected: a soft notice, deliberately not an error red. */
+.noteWarning {
+  border-color: rgba(166, 63, 39, 0.2);
+  background: rgba(166, 63, 39, 0.055);
+  color: #8f3b24;
 }
 
 .noteHired {
@@ -243,7 +305,7 @@
 }
 
 .contact {
-  margin: 0 20px 16px;
+  margin: 14px 20px 0;
   padding: 15px 16px;
   border: 1px solid var(--brand-green-shadow);
   border-radius: 16px;
@@ -307,6 +369,30 @@
   .footActions > * {
     flex: 1;
     justify-content: center;
+  }
+
+  /* The total panel keeps its row: icon left, amount and label beside it. */
+  .total {
+    gap: 11px;
+    padding: 12px 13px;
+  }
+
+  .totalIcon {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+
+  .totalValue {
+    font-size: 20px;
+  }
+
+  .note {
+    align-items: flex-start;
+  }
+
+  .noteIcon {
+    margin-top: 1px;
   }
 }
 

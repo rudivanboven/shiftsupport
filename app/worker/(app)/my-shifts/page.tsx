@@ -5,12 +5,14 @@ import {
   getWorkerApplications,
   type ApplicationWithShift,
 } from "@/lib/data/worker";
+import { getShiftReviewStates } from "@/lib/data/reviews";
 import { EmptyState, ErrorState, PageHeader, Panel } from "@/components/ui/Kit";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
 import Tabs, { type TabItem } from "@/components/dashboard/Tabs";
 import { buttonClass } from "@/components/ui/buttonClass";
 import { IconCalendar, IconSearch } from "@/components/dashboard/Icons";
 import { formatRelative, isPast } from "@/lib/format";
+import ShiftReviewBlock from "@/components/reviews/ShiftReviewBlock";
 import WithdrawButton from "./WithdrawButton";
 
 export const metadata: Metadata = { title: "My shifts | ShiftSupport" };
@@ -54,6 +56,13 @@ export default async function WorkerMyShiftsPage({
     .filter((a) => a.status === "approved" && a.shifts)
     .map((a) => a.shift_id);
   const contacts = await getContactsForShifts(hiredShiftIds);
+
+  // Review state for finished shifts they actually worked. Whether the
+  // window is open is the database's call, not this page's.
+  const finishedShiftIds = applications
+    .filter((a) => a.status === "approved" && a.shifts && isPast(a.shifts.end_time))
+    .map((a) => a.shift_id);
+  const reviewStates = await getShiftReviewStates(finishedShiftIds);
 
   const visible = applications.filter((a) => matches(a, filter));
 
@@ -125,9 +134,11 @@ export default async function WorkerMyShiftsPage({
             const declined = application.status === "rejected";
 
             const badge = hired
-              ? finished
+              ? shift.status === "completed"
                 ? { tone: "neutral" as const, label: "Completed" }
-                : { tone: "approved" as const, label: "You're hired" }
+                : finished
+                  ? { tone: "neutral" as const, label: "Finished" }
+                  : { tone: "approved" as const, label: "You're hired" }
               : declined
                 ? { tone: "rejected" as const, label: "Not selected" }
                 : { tone: "pending" as const, label: "Application pending" };
@@ -141,6 +152,7 @@ export default async function WorkerMyShiftsPage({
                 : undefined
               : declined
                 ? {
+                    tone: "warning" as const,
                     text: application.rejection_reason
                       ? `The retailer didn't pick you this time. Reason given: ${application.rejection_reason}`
                       : "The retailer went with someone else this time. Plenty of other shifts are open.",
@@ -159,6 +171,15 @@ export default async function WorkerMyShiftsPage({
                 note={note}
                 contact={hired ? (contacts.get(shift.id) ?? null) : null}
                 accent={hired ? "green" : declined || finished ? "muted" : "peach"}
+                footer={
+                  hired && finished ? (
+                    <ShiftReviewBlock
+                      shiftId={shift.id}
+                      state={reviewStates.get(shift.id)}
+                      subjectName={shift.stores?.name ?? "this store"}
+                    />
+                  ) : null
+                }
                 actions={
                   application.status === "pending" ? (
                     <WithdrawButton applicationId={application.id} />

@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import AuthLayout from "@/components/auth/AuthLayout";
+import { redirectIfSignedIn } from "@/lib/auth/session";
 import RetailerSignupForm from "./SignupForm";
 
 export const metadata: Metadata = {
   title: "Create a retailer account | ShiftSupport",
 };
 
-export default function RetailerSignupPage() {
+export default async function RetailerSignupPage() {
+  // A signed-in user never needs the signup form.
+  await redirectIfSignedIn();
+
   return (
     <AuthLayout
       wide

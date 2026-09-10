@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireWorker } from "@/lib/auth/session";
 import { syncProfileEmail, updateWorkerProfile } from "@/app/actions/profile";
 import { getWorkerApplications } from "@/lib/data/worker";
+import { getWorkerRating, getWorkerReviews } from "@/lib/data/reviews";
 import {
   Columns,
   MetaList,
@@ -16,6 +17,8 @@ import {
   PersonalDetailsForm,
 } from "@/components/account/AccountForms";
 import { IconCheck, IconClock, IconUser } from "@/components/dashboard/Icons";
+import { RatingBadge } from "@/components/reviews/Stars";
+import ReviewList from "@/components/reviews/ReviewList";
 import { formatDate, isPast } from "@/lib/format";
 
 export const metadata: Metadata = { title: "My profile | ShiftSupport" };
@@ -26,6 +29,12 @@ export default async function WorkerProfilePage() {
 
   const { applications } = await getWorkerApplications(worker.id);
   const approved = applications.filter((a) => a.status === "approved");
+
+  // Both come from real retailer -> worker reviews only.
+  const [rating, reviews] = await Promise.all([
+    getWorkerRating(worker.id),
+    getWorkerReviews(worker.id),
+  ]);
 
   return (
     <>
@@ -58,6 +67,13 @@ export default async function WorkerProfilePage() {
         </Stack>
 
         <Stack>
+          <Panel
+            title="Your rating"
+            description="Based on reviews retailers left after your completed shifts."
+          >
+            <RatingBadge rating={rating} emptyLabel="New worker — no reviews yet" />
+          </Panel>
+
           <Panel title="Your record" description="A summary of your ShiftSupport activity.">
             <MetaList>
               <MetaRow
@@ -87,6 +103,16 @@ export default async function WorkerProfilePage() {
                 }
               />
             </MetaList>
+          </Panel>
+
+          <Panel
+            title="Job reviews"
+            description="What retailers said about each shift you completed."
+          >
+            <ReviewList
+              reviews={reviews}
+              emptyText="No reviews yet. Once a retailer confirms a shift you worked, their review will show up here."
+            />
           </Panel>
 
           <Panel title="Privacy" description="What retailers can see.">

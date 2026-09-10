@@ -5,6 +5,7 @@ import {
   getStoreApplications,
   type ApplicationWithContext,
 } from "@/lib/data/retailer";
+import { getWorkerRating } from "@/lib/data/reviews";
 import { Badge, EmptyState, ErrorState, PageHeader, Panel } from "@/components/ui/Kit";
 import Tabs, { type TabItem } from "@/components/dashboard/Tabs";
 import { buttonClass } from "@/components/ui/buttonClass";
@@ -17,6 +18,7 @@ import {
   formatTime,
   initialsOf,
 } from "@/lib/format";
+import { RatingBadge } from "@/components/reviews/Stars";
 import ApplicantActions from "./ApplicantActions";
 import styles from "./applicants.module.css";
 
@@ -50,6 +52,17 @@ export default async function ApplicantsPage({
           .map((a) => a.shift_id),
       ),
     ],
+  );
+
+  // A rating per applicant, so the retailer can weigh who to hire. The count
+  // is shown alongside the average — one 5-star review is not a track record.
+  const workerIds = [
+    ...new Set(applications.map((a) => a.worker_id).filter(Boolean)),
+  ] as string[];
+  const ratings = new Map(
+    await Promise.all(
+      workerIds.map(async (id) => [id, await getWorkerRating(id)] as const),
+    ),
   );
 
   const scoped = params.shift
@@ -189,6 +202,17 @@ export default async function ApplicantsPage({
 
                         <div className={styles.who}>
                           <p className={styles.name}>{name}</p>
+                          <div style={{ margin: "3px 0 4px" }}>
+                            <RatingBadge
+                              rating={
+                                ratings.get(application.worker_id) ?? {
+                                  average: null,
+                                  total: 0,
+                                }
+                              }
+                              emptyLabel="No reviews yet"
+                            />
+                          </div>
                           <p className={styles.detail}>
                             <span>Applied {formatRelative(application.applied_at)}</span>
                             {contact?.phone ? (

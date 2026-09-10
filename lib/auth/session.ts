@@ -13,6 +13,19 @@ import type {
   UserRole,
 } from "@/lib/supabase/types";
 
+/**
+ * The one shape every part of the app uses to answer "who is signed in and
+ * what are they allowed to see". Produced only by `getCurrentUserWithRole`.
+ */
+export interface CurrentAccount {
+  user: User;
+  /** Always read from the `profiles` table — never from the URL or the client. */
+  role: UserRole | null;
+  profile: Profile | null;
+  /** Where this account belongs. `null` while the role is unknown. */
+  dashboardPath: string | null;
+}
+
 export interface WorkerAccount {
   user: User;
   profile: Profile;
@@ -31,6 +44,25 @@ export const dashboardPathFor = (role: UserRole | null | undefined) =>
 
 export const loginPathFor = (role: UserRole) =>
   role === "retailer" ? "/retailer/login" : "/worker/login";
+
+export const roleLabelFor = (role: UserRole | null | undefined) =>
+  role === "retailer" ? "Retailer" : role === "admin" ? "Admin" : "Worker";
+
+/**
+ * How to greet someone: their real profile name, falling back to the part of
+ * their email before the "@" when the profile has no name yet.
+ */
+export function displayNameFor(account: {
+  profile?: { full_name?: string | null } | null;
+  user: { email?: string | null };
+}) {
+  const fullName = account.profile?.full_name?.trim();
+  if (fullName) return fullName;
+
+  const email = account.user.email ?? "";
+  const prefix = email.split("@")[0]?.trim();
+  return prefix || "there";
+}
 
 /**
  * The signed-in auth user, validated against the Supabase auth server.
@@ -65,16 +97,86 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
 });
 
 /**
+ * THE role resolver. Every session/role decision in the app goes through this
+ * one function, so a page can never invent its own idea of who the user is.
+ *
+ * `cache()` de-duplicates it per request, so calling it from a layout, a page
+ * and a component costs a single lookup.
+ */
+export const getCurrentUserWithRole = cache(
+  async (): Promise<CurrentAccount | null> => {
+    const user = await getUser();
+    if (!user) return null;
+
+    const profile = await getProfile();
+    const role = profile?.role ?? null;
+
+    return {
+      user,
+      role,
+      profile,
+      dashboardPath: role ? dashboardPathFor(role) : null,
+    };
+  },
+);
+
+/**
+ * Same resolver, but a database hiccup returns "signed out" instead of
+ * throwing. Only for public marketing pages, where a failed profile lookup
+ * must not take the whole page down — never for an access decision.
+ */
+export async function getCurrentUserWithRoleSafe(): Promise<CurrentAccount | null> {
+  try {
+    return await getCurrentUserWithRole();
+  } catch (error) {
+    // `redirect()`, `notFound()` and the "this route reads cookies, render it
+    // dynamically" signal are all thrown errors that Next.js has to receive.
+    // Swallowing them would break rendering, so only real failures stop here.
+    if (isFrameworkSignal(error)) throw error;
+
+    console.error(
+      "[auth] Could not resolve the current account:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+    return null;
+  }
+}
+
+function isFrameworkSignal(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return (
+    typeof digest === "string" &&
+    (digest.startsWith("NEXT_") || digest === "DYNAMIC_SERVER_USAGE")
+  );
+}
+
+/**
+ * Guard for the login and signup pages: a signed-in user is sent to the
+ * dashboard their *profile role* points at, whichever door they walked through.
+ *
+ * `skip` is passed when the login page is showing an account problem
+ * (`?error=missing_worker`), which is the one case where bouncing them back to
+ * the dashboard would be a redirect loop.
+ */
+export async function redirectIfSignedIn(options: { skip?: boolean } = {}) {
+  if (options.skip) return;
+
+  const account = await getCurrentUserWithRoleSafe();
+  if (account?.dashboardPath) redirect(account.dashboardPath);
+}
+
+/**
  * Gate for every /worker/* dashboard route.
  * Anonymous -> worker login. Retailer -> their own dashboard.
  */
 export async function requireWorker(): Promise<WorkerAccount> {
-  const user = await getUser();
-  if (!user) redirect("/worker/login");
+  const account = await getCurrentUserWithRole();
+  if (!account) redirect("/worker/login");
 
-  const profile = await getProfile();
+  const { user, profile } = account;
   if (!profile) redirect("/worker/login?error=missing_profile");
-  if (profile.role !== "worker") redirect(dashboardPathFor(profile.role));
+  // A retailer never renders a worker page — they go to their own dashboard.
+  if (account.role !== "worker") redirect(account.dashboardPath ?? "/retailer/dashboard");
 
   const supabase = await createClient();
   // `workers` has column-level privileges (phone/email are protected), so the
@@ -99,12 +201,13 @@ export async function requireWorker(): Promise<WorkerAccount> {
  * Anonymous -> retailer login. Worker -> their own dashboard.
  */
 export async function requireRetailer(): Promise<RetailerAccount> {
-  const user = await getUser();
-  if (!user) redirect("/retailer/login");
+  const account = await getCurrentUserWithRole();
+  if (!account) redirect("/retailer/login");
 
-  const profile = await getProfile();
+  const { user, profile } = account;
   if (!profile) redirect("/retailer/login?error=missing_profile");
-  if (profile.role !== "retailer") redirect(dashboardPathFor(profile.role));
+  // A worker never renders a retailer page — they go to their own dashboard.
+  if (account.role !== "retailer") redirect(account.dashboardPath ?? "/worker/dashboard");
 
   const supabase = await createClient();
   const { data: storeUser, error: storeUserError } = await supabase

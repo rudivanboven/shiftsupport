@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { Alert } from "@/components/ui/Form";
+import { redirectIfSignedIn } from "@/lib/auth/session";
 import RetailerLoginForm from "./LoginForm";
 
 export const metadata: Metadata = {
@@ -26,6 +27,9 @@ export default async function RetailerLoginPage({
 }) {
   const params = await searchParams;
   const notice = params.error ? NOTICES[params.error] : undefined;
+
+  // Already signed in? Go straight to whichever dashboard their role owns.
+  await redirectIfSignedIn({ skip: Boolean(params.error) });
 
   return (
     <AuthLayout

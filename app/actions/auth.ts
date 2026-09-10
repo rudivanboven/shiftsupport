@@ -64,6 +64,13 @@ function friendlyAuthError(error: { code?: string; message: string }) {
 const isSafePath = (path: string) =>
   path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\");
 
+const dashboardFor = (role: UserRole) =>
+  role === "retailer" ? "/retailer/dashboard" : "/worker/dashboard";
+
+/** Stops a `?next=` from dropping a worker into the retailer area, or the reverse. */
+const isOtherRoleArea = (path: string, role: UserRole) =>
+  role === "retailer" ? path.startsWith("/worker/") : path.startsWith("/retailer/");
+
 /* ------------------------------------------------------------------ *
  * Provisioning
  *
@@ -339,7 +346,10 @@ async function signIn(
 
   if (profileError) {
     console.error("[signIn] profile lookup failed", profileError);
-    await supabase.auth.signOut();
+    // Local scope only: this clears the cookie for THIS browser. A global
+    // sign-out would revoke the refresh token behind every other session this
+    // person has, logging them out of tabs and devices that were working fine.
+    await supabase.auth.signOut({ scope: "local" });
     return {
       error: "We couldn't load your account profile. Please try again or contact support.",
       values,
@@ -348,20 +358,8 @@ async function signIn(
 
   const role = (profile?.role as UserRole | undefined) ?? null;
 
-  // Wrong door: sign back out rather than silently crossing over.
-  if (role && role !== expectedRole) {
-    await supabase.auth.signOut();
-    return {
-      error:
-        expectedRole === "worker"
-          ? "This is a retailer account. Please use the retailer login."
-          : "This is a worker account. Please use the worker login.",
-      values,
-    };
-  }
-
   if (!role) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     return { error: "This account isn't set up yet. Please sign up first.", values };
   }
 
@@ -375,8 +373,17 @@ async function signIn(
   }
 
   revalidatePath("/", "layout");
-  const home = role === "retailer" ? "/retailer/dashboard" : "/worker/dashboard";
-  redirect(isSafePath(next) ? next : home);
+
+  const home = dashboardFor(role);
+
+  // Wrong door. The credentials are valid, so keep the session and send them
+  // to the dashboard their role actually points at — they are never treated as
+  // the other role, and a mistyped door never costs them their session.
+  if (role !== expectedRole) redirect(home);
+
+  // Honour ?next= only when it belongs to this account's own area.
+  const wanted = isSafePath(next) ? next : "";
+  redirect(wanted && !isOtherRoleArea(wanted, role) ? wanted : home);
 }
 
 export async function signInWorker(_prev: FormState, formData: FormData) {
@@ -391,11 +398,20 @@ export async function signInRetailer(_prev: FormState, formData: FormData) {
  * Sign out
  * ------------------------------------------------------------------ */
 
-export async function signOutAction() {
+/**
+ * The single logout path for the whole app — dashboards and the account strips
+ * on the public pages all post here, so the session is always torn down the
+ * same way. An optional `redirectTo` field decides where the user lands.
+ */
+export async function signOutAction(formData?: FormData) {
   const supabase = await createClient();
   await supabase.auth.signOut();
+
+  const requested = formData instanceof FormData ? str(formData.get("redirectTo")) : "";
+  const destination = isSafePath(requested) ? requested : "/";
+
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destination);
 }
 
 /* ------------------------------------------------------------------ *

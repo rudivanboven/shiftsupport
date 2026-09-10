@@ -1,0 +1,120 @@
+/* ---------- shared star glyph ---------- */
+
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.star {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--brand-green);
+}
+
+.starLarge {
+  width: 34px;
+  height: 34px;
+}
+
+.empty {
+  color: rgba(22, 48, 36, 0.18);
+}
+
+/* ---------- rating summary ---------- */
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.average {
+  font-family: var(--font-heading);
+  font-weight: var(--w-semibold);
+  font-size: 19px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.count {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.none {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.newBadge {
+  padding: 3px 9px;
+  border: 1px solid var(--brand-green-tint);
+  border-radius: 999px;
+  background: var(--brand-green-tint);
+  color: var(--brand-green);
+  font-family: var(--font-heading);
+  font-size: 11.5px;
+  font-weight: var(--w-medium);
+}
+
+/* ---------- interactive input ---------- */
+
+.input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.starButton {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.14s ease;
+}
+
+.starButton:hover {
+  transform: scale(1.1);
+}
+
+.starButton:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 1px;
+}
+
+.starButton:disabled {
+  cursor: default;
+  transform: none;
+}
+
+.inputLabel {
+  margin-left: 8px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: var(--w-medium);
+  color: var(--ink);
+}
+
+.inputHint {
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+@media (max-width: 480px) {
+  .starLarge {
+    width: 30px;
+    height: 30px;
+  }
+}

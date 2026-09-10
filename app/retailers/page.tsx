@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Header from "@/components/layout/Header/Header";
 import Footer from "@/components/layout/Footer/Footer";
 import Positioning from "@/components/home/Positioning/Positioning";
+import AccountStrip from "@/components/account/AccountStrip";
 import RetailerResources from "./RetailerResources";
 import styles from "./page.module.css";
 
@@ -72,10 +73,13 @@ export default function RetailersPage() {
     <>
       <Header />
       <main className={styles.page}>
+        <div className="container">
+          <AccountStrip audience="retailer" returnTo="/retailers" />
+        </div>
+
         <section className={styles.hero}>
           <span className={`${styles.decorCircle} ${styles.heroCircle}`} aria-hidden="true" />
           <div className="container">
-            <nav className={styles.breadcrumb} aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Retailers</span></nav>
             <div className={styles.heroGrid}>
               <div className={styles.heroCopy}>
                 <Eyebrow>FOR LOCAL RETAILERS</Eyebrow>

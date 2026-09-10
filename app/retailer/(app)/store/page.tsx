@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireRetailer } from "@/lib/auth/session";
 import { getStoreShifts } from "@/lib/data/retailer";
+import { getStoreRating, getStoreReviews } from "@/lib/data/reviews";
 import {
   Columns,
   MetaList,
@@ -18,6 +19,8 @@ import {
   IconPin,
   IconStore,
 } from "@/components/dashboard/Icons";
+import { RatingBadge } from "@/components/reviews/Stars";
+import ReviewList from "@/components/reviews/ReviewList";
 import { formatDate } from "@/lib/format";
 import StoreForm from "./StoreForm";
 
@@ -26,6 +29,12 @@ export const metadata: Metadata = { title: "My store | ShiftSupport" };
 export default async function StorePage() {
   const { store } = await requireRetailer();
   const { shifts } = await getStoreShifts(store.id);
+
+  // Real worker -> retailer reviews for this store.
+  const [rating, reviews] = await Promise.all([
+    getStoreRating(store.id),
+    getStoreReviews(store.id),
+  ]);
 
   return (
     <>
@@ -66,6 +75,27 @@ export default async function StorePage() {
         </Panel>
 
         <Stack>
+          <Panel
+            title="Your store rating"
+            description="Based on reviews workers left after completed shifts."
+          >
+            <RatingBadge
+              rating={rating}
+              noun="worker review"
+              emptyLabel="New store — no worker reviews yet"
+            />
+          </Panel>
+
+          <Panel
+            title="Worker reviews"
+            description="What workers said about each shift they completed for you."
+          >
+            <ReviewList
+              reviews={reviews}
+              emptyText="No reviews yet. Workers can review a shift 3 days after you mark it completed."
+            />
+          </Panel>
+
           <Panel title="How workers see you" description="A preview of your store card.">
             <MetaList>
               <MetaRow

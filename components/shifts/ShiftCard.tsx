@@ -11,6 +11,7 @@ import {
   IconUsers,
 } from "@/components/dashboard/Icons";
 import {
+  currencySymbol,
   formatDate,
   formatDuration,
   formatMoney,
@@ -24,6 +25,24 @@ import styles from "./ShiftCard.module.css";
 export const ShiftGrid = ({ children }: { children: ReactNode }) => (
   <div className={styles.grid}>{children}</div>
 );
+
+function NoticeIcon() {
+  return (
+    <svg
+      className={styles.noteIcon}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="8.6" />
+      <path d="M12 7.9v4.6" />
+      <path d="M12 15.8h.01" />
+    </svg>
+  );
+}
 
 export const SHIFT_STATUS_LABEL: Record<string, string> = {
   open: "Open",
@@ -45,9 +64,16 @@ interface ShiftCardProps {
   storeAddress?: string | null;
   badge?: { tone: BadgeTone; label: string };
   applicantCount?: { pending: number; total: number };
-  note?: { text: string; hired?: boolean };
+  note?: {
+    text: string;
+    hired?: boolean;
+    /** "warning" is the soft not-selected notice, not an error. */
+    tone?: "warning";
+  };
   contact?: StoreContact | null;
   actions?: ReactNode;
+  /** Rendered as the last block in the card — used for the review state. */
+  footer?: ReactNode;
   accent?: "green" | "muted" | "peach";
 }
 
@@ -60,6 +86,7 @@ export default function ShiftCard({
   note,
   contact,
   actions,
+  footer,
   accent = "green",
 }: ShiftCardProps) {
   const status = shift.status ?? "open";
@@ -145,9 +172,14 @@ export default function ShiftCard({
       </div>
 
       {note ? (
-        <p className={`${styles.note} ${note.hired ? styles.noteHired : ""}`}>
-          {note.text}
-        </p>
+        <div
+          className={`${styles.note} ${note.hired ? styles.noteHired : ""} ${
+            note.tone === "warning" ? styles.noteWarning : ""
+          }`}
+        >
+          {note.tone === "warning" ? <NoticeIcon /> : null}
+          <p className={styles.noteText}>{note.text}</p>
+        </div>
       ) : null}
 
       {contact ? (
@@ -187,31 +219,42 @@ export default function ShiftCard({
       ) : null}
 
       <div className={styles.foot}>
-        <div className={styles.pay}>
-          <span className={styles.payValue}>
-            {pay === null ? "—" : formatMoney(pay)}
+        <div className={styles.total}>
+          <span className={styles.totalIcon} aria-hidden="true">
+            {currencySymbol()}
           </span>
-          <span className={styles.payLabel}>
-            {pay === null ? "Rate to be confirmed" : "Estimated total for the shift"}
+          <span className={styles.totalText}>
+            <span className={styles.totalValue}>
+              {pay === null ? "—" : formatMoney(pay)}
+            </span>
+            <span className={styles.totalLabel}>
+              {pay === null ? "Rate to be confirmed" : "Estimated total for the shift"}
+            </span>
           </span>
         </div>
 
-        {applicantCount ? (
-          <span
-            className={`${styles.applicants} ${
-              applicantCount.pending > 0 ? styles.applicantsHot : ""
-            }`}
-          >
-            <IconUsers width={14} height={14} />
-            {applicantCount.total === 0
-              ? "No applicants"
-              : `${applicantCount.total} applicant${applicantCount.total === 1 ? "" : "s"}`}
-            {applicantCount.pending > 0 ? ` · ${applicantCount.pending} new` : ""}
-          </span>
-        ) : null}
+        {applicantCount || actions ? (
+          <div className={styles.footRow}>
+            {applicantCount ? (
+              <span
+                className={`${styles.applicants} ${
+                  applicantCount.pending > 0 ? styles.applicantsHot : ""
+                }`}
+              >
+                <IconUsers width={14} height={14} />
+                {applicantCount.total === 0
+                  ? "No applicants"
+                  : `${applicantCount.total} applicant${applicantCount.total === 1 ? "" : "s"}`}
+                {applicantCount.pending > 0 ? ` · ${applicantCount.pending} new` : ""}
+              </span>
+            ) : null}
 
-        {actions ? <div className={styles.footActions}>{actions}</div> : null}
+            {actions ? <div className={styles.footActions}>{actions}</div> : null}
+          </div>
+        ) : null}
       </div>
+
+      {footer}
     </article>
   );
 }

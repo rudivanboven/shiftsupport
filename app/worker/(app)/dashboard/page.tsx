@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { requireWorker } from "@/lib/auth/session";
+import { displayNameFor, requireWorker } from "@/lib/auth/session";
 import {
   getAvailableShifts,
   getContactsForShifts,
   getWorkerApplications,
   summariseWorker,
 } from "@/lib/data/worker";
+import { getShiftReviewStates, getWorkerRating } from "@/lib/data/reviews";
 import {
   Columns,
   EmptyState,
@@ -16,6 +17,8 @@ import {
   StatGrid,
   WelcomeBanner,
 } from "@/components/ui/Kit";
+import DashboardUserStrip from "@/components/dashboard/DashboardUserStrip";
+import { RatingBadge } from "@/components/reviews/Stars";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
 import { buttonClass } from "@/components/ui/buttonClass";
 import {
@@ -31,7 +34,7 @@ import styles from "./dashboard.module.css";
 export const metadata: Metadata = { title: "Dashboard | ShiftSupport for workers" };
 
 export default async function WorkerDashboardPage() {
-  const { profile, worker } = await requireWorker();
+  const { user, profile, worker } = await requireWorker();
 
   const [{ shifts, error: shiftsError }, { applications, error: appsError }] =
     await Promise.all([getAvailableShifts(), getWorkerApplications(worker.id)]);
@@ -56,8 +59,24 @@ export default async function WorkerDashboardPage() {
 
   const recentActivity = applications.slice(0, 5);
 
+  // Their own rating, plus how many completed shifts are waiting on a review.
+  const finishedShiftIds = applications
+    .filter((a) => a.status === "approved" && a.shifts && isPast(a.shifts.end_time))
+    .map((a) => a.shift_id);
+  const [rating, reviewStates] = await Promise.all([
+    getWorkerRating(worker.id),
+    getShiftReviewStates(finishedShiftIds),
+  ]);
+  const reviewsToLeave = [...reviewStates.values()].filter((s) => s.can_review).length;
+
   return (
     <>
+      <DashboardUserStrip
+        name={displayNameFor({ profile, user })}
+        role="Worker"
+        dashboardHref="/worker/dashboard"
+      />
+
       <WelcomeBanner
         badge="Worker dashboard"
         title={`Welcome back, ${firstNameOf(profile.full_name ?? worker.full_name)}`}
@@ -113,6 +132,23 @@ export default async function WorkerDashboardPage() {
               tone="neutral"
             />
           </StatGrid>
+
+          <div style={{ marginBottom: 18 }}>
+            <Panel
+              title="Your rating"
+              description="What retailers said after the shifts you completed."
+              action={{ href: "/worker/profile", label: "See all reviews" }}
+            >
+              <RatingBadge rating={rating} emptyLabel="New worker — no reviews yet" />
+              {reviewsToLeave > 0 ? (
+                <p style={{ margin: "12px 0 0", fontSize: 13.5, color: "var(--muted)" }}>
+                  You have {reviewsToLeave} completed shift
+                  {reviewsToLeave === 1 ? "" : "s"} you can review.{" "}
+                  <a href="/worker/my-shifts?filter=completed">Rate the store</a>
+                </p>
+              ) : null}
+            </Panel>
+          </div>
 
           {upcomingHired.length > 0 ? (
             <div style={{ marginBottom: 18 }}>

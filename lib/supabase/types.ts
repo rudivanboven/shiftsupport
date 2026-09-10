@@ -68,6 +68,12 @@ export interface Shift {
   status: ShiftStatus;
   accepted_by: string | null;
   created_by: string | null;
+  /**
+   * Set only when the store confirms the shift happened; it starts the review
+   * clock. Optional here because the shift queries do not select it — review
+   * state comes from `get_shift_review_state` instead.
+   */
+  completed_at?: string | null;
   created_at: string | null;
   updated_at: string;
 }
@@ -123,3 +129,63 @@ export interface StoreContact {
  * drifts silently; instead every query result is cast to the interfaces above
  * at the call site, which is where the shape actually matters.
  */
+
+/* ------------------------------------------------------------------ *
+ * Reviews (migration 0005)
+ * ------------------------------------------------------------------ */
+
+export type ReviewSide = "worker" | "retailer";
+
+export interface Review {
+  id: string;
+  shift_id: string;
+  reviewer_user_id: string;
+  reviewee_user_id: string;
+  reviewer_role: ReviewSide;
+  reviewee_role: ReviewSide;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
+
+/** One row of `get_shift_review_state` — the server's verdict for one shift. */
+export interface ShiftReviewState {
+  shift_id: string;
+  shift_status: string;
+  completed_at: string | null;
+  review_opens_at: string | null;
+  /** Decided by the database clock, never by the browser. */
+  can_review: boolean;
+  viewer_role: ReviewSide | null;
+  my_rating: number | null;
+  my_comment: string | null;
+  my_review_created_at: string | null;
+  received_rating: number | null;
+}
+
+export interface RatingSummary {
+  average: number | null;
+  total: number;
+}
+
+export interface WorkerReviewEntry {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  shift_id: string;
+  task_type: string;
+  shift_date: string;
+  store_name: string;
+}
+
+export interface StoreReviewEntry {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  shift_id: string;
+  task_type: string;
+  shift_date: string;
+  worker_name: string | null;
+}

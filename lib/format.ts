@@ -31,13 +31,39 @@ export function formatDateTime(value: string | null | undefined) {
   return `${formatDate(value)} · ${formatTime(value)}`;
 }
 
+const CURRENCY = "USD";
+
+/**
+ * `narrowSymbol` keeps this as "$112.42" rather than en-GB's default
+ * "US$112.42", while leaving date formatting on the same locale as before.
+ */
+const money = (value: number, fractionDigits: number) =>
+  new Intl.NumberFormat(NL, {
+    style: "currency",
+    currency: CURRENCY,
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: fractionDigits,
+  }).format(value);
+
 export function formatMoney(value: number | null | undefined) {
   if (value === null || value === undefined) return "Rate on request";
-  return new Intl.NumberFormat(NL, {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
-  }).format(value);
+  return money(value, value % 1 === 0 ? 0 : 2);
+}
+
+/**
+ * Just the currency symbol, taken from the same formatter as the amounts, so
+ * a badge showing "$" cannot drift away from what the numbers next to it say.
+ */
+export function currencySymbol() {
+  return (
+    new Intl.NumberFormat(NL, {
+      style: "currency",
+      currency: CURRENCY,
+      currencyDisplay: "narrowSymbol",
+    })
+      .formatToParts(0)
+      .find((part) => part.type === "currency")?.value ?? "$"
+  );
 }
 
 export function formatRate(value: number | null | undefined) {

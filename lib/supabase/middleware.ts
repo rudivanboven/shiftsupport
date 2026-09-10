@@ -1,18 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-/** Dashboard areas that require a signed-in user of the matching role. */
+/** Dashboard areas that require a signed-in user. */
 const WORKER_AREA = /^\/worker\/(dashboard|available-shifts|my-shifts|notifications|profile)/;
 const RETAILER_AREA = /^\/retailer\/(dashboard|shifts|applicants|store|profile)/;
 
+const isProtected = (path: string) => WORKER_AREA.test(path) || RETAILER_AREA.test(path);
+
 /**
- * Refreshes the Supabase session cookie on every request, then applies a
- * first line of role-based routing.
+ * Statuses that mean "this token really is not valid" as opposed to
+ * "we could not reach the auth server right now".
+ */
+const isDefinitelySignedOut = (status: number | undefined) =>
+  status === 400 || status === 401 || status === 403;
+
+/**
+ * Refreshes the Supabase session cookie on every request, and keeps
+ * signed-out visitors out of the dashboards.
  *
- * The role here comes from `app_metadata`, which is signed into the JWT and
- * can only be written with the service-role key — a user cannot edit it.
- * It is still only a redirect hint: each page re-checks the role against the
- * `profiles` table, and the database enforces access through RLS.
+ * Deliberately does NOT decide anything about roles. Role routing lives in
+ * one place — `getCurrentUserWithRole`, which reads the `profiles` table —
+ * because two sources of truth (a JWT claim here, the database there) can
+ * disagree and bounce a user between the two dashboards forever.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -36,10 +45,13 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          // Update the incoming request first so that the page rendered
+          // downstream reads the *refreshed* tokens, not the expired ones.
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
           response = NextResponse.next({ request });
+          // ...and write them back to the browser so the refresh sticks.
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }
@@ -49,45 +61,45 @@ export async function updateSession(request: NextRequest) {
   );
 
   const path = request.nextUrl.pathname;
+
+  // Does the browser even claim to have a session? Used to tell a genuine
+  // anonymous visitor apart from a signed-in user whose token lookup failed.
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("auth-token"));
+
   let user = null;
+  // Assume the best when the auth server cannot answer: a rate-limited or
+  // briefly unreachable Auth API must not log everybody out. The page's own
+  // guard (and RLS) still refuse to serve data without a valid session.
+  let signedOut = !hasAuthCookie;
 
   try {
-    const result = await supabase.auth.getUser();
-    user = result.data.user;
+    // This call is what refreshes an expired access token and, through
+    // `setAll` above, writes the new cookies. Do not remove it.
+    const { data, error } = await supabase.auth.getUser();
+    user = data.user;
+    if (!user) signedOut = isDefinitelySignedOut(error?.status);
   } catch (error) {
-    // A temporary Auth/network failure must not crash every route matched by
-    // Proxy. Page layouts remain the authoritative dashboard access guards.
     console.error(
       "[proxy] Supabase session refresh failed:",
       error instanceof Error ? error.message : "Unknown error",
     );
   }
 
-  const role = (user?.app_metadata?.role as string | undefined) ?? null;
-  const homeFor = (r: string | null) =>
-    r === "retailer" ? "/retailer/dashboard" : "/worker/dashboard";
-
-  const go = (to: string, next?: string) => {
+  if (!user && signedOut && isProtected(path)) {
     const url = request.nextUrl.clone();
-    url.pathname = to;
-    url.search = next ? `?next=${encodeURIComponent(next)}` : "";
-    const redirect = NextResponse.redirect(url);
+    url.pathname = WORKER_AREA.test(path) ? "/worker/login" : "/retailer/login";
+    url.search = `?next=${encodeURIComponent(path)}`;
 
-    // If getUser refreshed the session, retain those cookies on redirects.
+    const redirect = NextResponse.redirect(url);
+    // If the session was cleared while getting here, keep those cookie
+    // instructions so the browser does not hold on to a dead token.
     for (const cookie of response.cookies.getAll()) {
       redirect.cookies.set(cookie);
     }
-
     return redirect;
-  };
-
-  if (!user) {
-    if (WORKER_AREA.test(path)) return go("/worker/login", path);
-    if (RETAILER_AREA.test(path)) return go("/retailer/login", path);
-    return response;
   }
 
-  if (WORKER_AREA.test(path) && role === "retailer") return go("/retailer/dashboard");
-  if (RETAILER_AREA.test(path) && role === "worker") return go("/worker/dashboard");
   return response;
 }

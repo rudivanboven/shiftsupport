@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { requireRetailer } from "@/lib/auth/session";
+import { displayNameFor, requireRetailer } from "@/lib/auth/session";
 import {
   countApplicationsByShift,
   getStoreApplications,
   getStoreShifts,
   summariseShifts,
 } from "@/lib/data/retailer";
+import { getShiftReviewStates, getStoreRating } from "@/lib/data/reviews";
 import {
   Badge,
   Columns,
@@ -17,6 +18,8 @@ import {
   StatGrid,
   WelcomeBanner,
 } from "@/components/ui/Kit";
+import DashboardUserStrip from "@/components/dashboard/DashboardUserStrip";
+import { RatingBadge } from "@/components/reviews/Stars";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
 import { buttonClass } from "@/components/ui/buttonClass";
 import {
@@ -28,13 +31,13 @@ import {
   IconTrend,
   IconUsers,
 } from "@/components/dashboard/Icons";
-import { firstNameOf, formatRelative, initialsOf } from "@/lib/format";
+import { firstNameOf, formatRelative, initialsOf, isPast } from "@/lib/format";
 import styles from "./dashboard.module.css";
 
 export const metadata: Metadata = { title: "Dashboard | ShiftSupport for retailers" };
 
 export default async function RetailerDashboardPage() {
-  const { profile, store } = await requireRetailer();
+  const { user, profile, store } = await requireRetailer();
 
   const [{ shifts, error: shiftsError }, { applications, error: appsError }] =
     await Promise.all([getStoreShifts(store.id), getStoreApplications(store.id)]);
@@ -45,8 +48,23 @@ export default async function RetailerDashboardPage() {
   const recentApplications = applications.slice(0, 5);
   const loadError = shiftsError ?? appsError;
 
+  // Store rating, plus how many finished shifts still need the retailer.
+  const finished = shifts.filter((s) => s.accepted_by && isPast(s.end_time));
+  const [rating, reviewStates] = await Promise.all([
+    getStoreRating(store.id),
+    getShiftReviewStates(finished.map((s) => s.id)),
+  ]);
+  const reviewsToLeave = [...reviewStates.values()].filter((s) => s.can_review).length;
+  const awaitingCompletion = finished.filter((s) => s.status !== "completed").length;
+
   return (
     <>
+      <DashboardUserStrip
+        name={displayNameFor({ profile, user })}
+        role="Retailer"
+        dashboardHref="/retailer/dashboard"
+      />
+
       <WelcomeBanner
         badge={store.name}
         title={`Welcome back, ${firstNameOf(profile.full_name)}`}
@@ -98,6 +116,28 @@ export default async function RetailerDashboardPage() {
               tone="neutral"
             />
           </StatGrid>
+
+          <div style={{ marginBottom: 18 }}>
+            <Panel
+              title="Your store rating"
+              description="What workers said after the shifts they completed for you."
+              action={{ href: "/retailer/store", label: "See all reviews" }}
+            >
+              <RatingBadge
+                rating={rating}
+                noun="worker review"
+                emptyLabel="New store — no worker reviews yet"
+              />
+              {awaitingCompletion > 0 || reviewsToLeave > 0 ? (
+                <p style={{ margin: "12px 0 0", fontSize: 13.5, color: "var(--muted)" }}>
+                  {awaitingCompletion > 0
+                    ? `${awaitingCompletion} finished shift${awaitingCompletion === 1 ? "" : "s"} still need confirming.`
+                    : `You can review ${reviewsToLeave} completed shift${reviewsToLeave === 1 ? "" : "s"}.`}{" "}
+                  <a href="/retailer/shifts?filter=past">Open past shifts</a>
+                </p>
+              ) : null}
+            </Panel>
+          </div>
 
           <Columns>
             <Stack>
