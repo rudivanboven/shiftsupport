@@ -13,7 +13,7 @@ import {
 import { buttonClass } from "@/components/ui/buttonClass";
 import { Panel } from "@/components/ui/Kit";
 import { IconCheck } from "@/components/dashboard/Icons";
-import { formatDate, formatDuration, formatMoney } from "@/lib/format";
+import { formatDate, formatDuration } from "@/lib/format";
 import type { FormState } from "@/lib/validation";
 import styles from "./PostShiftForm.module.css";
 
@@ -28,6 +28,14 @@ const TASK_SUGGESTIONS = [
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+const formatUsd = (value: number, alwaysShowCents = false) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: alwaysShowCents ? 2 : value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 
 export default function PostShiftForm({
   storeName,
@@ -182,7 +190,7 @@ export default function PostShiftForm({
             </FormRow>
 
             <Input
-              label="Hourly rate (€)"
+              label="Hourly rate ($)"
               name="hourlyRate"
               type="number"
               min="0"
@@ -244,7 +252,7 @@ export default function PostShiftForm({
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>Rate</span>
             <span className={styles.summaryValue}>
-              {rate ? `${formatMoney(Number(rate))}/hr` : "On request"}
+              {rate ? `${formatUsd(Number(rate))}/hr` : "On request"}
             </span>
           </div>
         </div>
@@ -252,7 +260,7 @@ export default function PostShiftForm({
         <div className={styles.total}>
           <span className={styles.totalLabel}>Estimated cost</span>
           <span className={styles.totalValue}>
-            {total === null ? "—" : formatMoney(total)}
+            {total === null ? "—" : formatUsd(total, true)}
           </span>
         </div>
 

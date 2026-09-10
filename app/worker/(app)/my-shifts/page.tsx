@@ -133,12 +133,12 @@ export default async function WorkerMyShiftsPage({
                 : { tone: "pending" as const, label: "Application pending" };
 
             const note = hired
-              ? {
-                  text: finished
-                    ? "This shift is done. Thanks for covering it."
-                    : "You're hired for this shift. The store's contact details are below — get in touch if anything changes.",
-                  hired: true,
-                }
+              ? finished
+                ? {
+                    text: "This shift is done. Thanks for covering it.",
+                    hired: true,
+                  }
+                : undefined
               : declined
                 ? {
                     text: application.rejection_reason
