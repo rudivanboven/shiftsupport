@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { buttonClass } from "@/components/ui/buttonClass";
-import { IconClose } from "@/components/dashboard/Icons";
+import { IconClose, IconPin } from "@/components/dashboard/Icons";
 import {
   formatDate,
   formatDuration,
@@ -25,6 +25,7 @@ export default function ShiftDetails({
 }) {
   const [open, setOpen] = useState(false);
   const pay = totalPay(shift.hourly_rate, shift.duration);
+  const location = shift.shift_location ?? storeAddress ?? "Address not provided";
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +46,6 @@ export default function ShiftDetails({
 
   const rows: [string, string][] = [
     ["Store", storeName],
-    ["Location", storeAddress ?? "Address not provided"],
     ["Task", shift.task_type],
     ["Date", formatDate(shift.start_time)],
     ["Start", formatTime(shift.start_time)],
@@ -91,6 +91,14 @@ export default function ShiftDetails({
             {shift.description ? (
               <p className={styles.dialogText}>{shift.description}</p>
             ) : null}
+
+            <div className={styles.location}>
+              <IconPin width={19} height={19} />
+              <span>
+                <span className={styles.locationLabel}>Shift location</span>
+                <span className={styles.locationValue}>{location}</span>
+              </span>
+            </div>
 
             <dl className={styles.dialogList}>
               {rows.map(([label, value]) => (

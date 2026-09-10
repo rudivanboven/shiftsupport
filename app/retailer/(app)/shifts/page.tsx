@@ -119,6 +119,7 @@ export default async function RetailerShiftsPage({
               <ShiftCard
                 key={shift.id}
                 shift={shift}
+                storeAddress={store.address}
                 applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
                 accent={cancelled || past ? "muted" : shift.accepted_by ? "peach" : "green"}
                 badge={

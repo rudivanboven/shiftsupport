@@ -61,6 +61,16 @@
   overflow-wrap: anywhere;
 }
 
+.locationRow {
+  align-items: flex-start;
+  background: rgba(214, 239, 146, 0.22);
+}
+
+.locationRow .summaryLabel,
+.locationRow .summaryValue {
+  color: var(--ink);
+}
+
 .total {
   margin-top: 16px;
   padding: 15px 16px;

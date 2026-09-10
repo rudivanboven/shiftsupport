@@ -10,7 +10,7 @@ import type {
 } from "@/lib/supabase/types";
 
 const SHIFT_COLUMNS =
-  "id,store_id,task_type,description,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at";
+  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at";
 
 /** `stores` has column-level privileges: contact_phone is not selectable here. */
 const STORE_COLUMNS = "id,name,address";

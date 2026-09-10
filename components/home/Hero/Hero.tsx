@@ -9,9 +9,10 @@ const builtForItems = [
 export default function Hero() {
   return (
     <section className={styles.hero}>
-      <div className={styles.heroInner}>
-        <div className={styles.contentSide}>
-          <div className={styles.contentWrap}>
+      <div className={styles.heroGlow} aria-hidden="true" />
+
+      <div className={`container ${styles.heroInner}`}>
+        <div className={styles.contentWrap}>
             <p className={`headingFont ${styles.eyebrow}`}>LOCAL PEOPLE. STRONGER COMMUNITIES.</p>
 
             <h1 className={`headingFont ${styles.title}`}>
@@ -59,15 +60,18 @@ export default function Hero() {
                 Find a Shift <span aria-hidden="true">→</span>
               </a>
             </div>
-          </div>
         </div>
 
-        <div className={styles.imageSide}>
-          <img
-            className={styles.heroImage}
-            src="/images/rr.jpg"
-            alt="Local retailer in a shop holding a clipboard"
-          />
+        <div className={styles.visualWrap}>
+          <div className={styles.backCard} aria-hidden="true" />
+          <div className={styles.imageCard}>
+            <img
+              className={styles.heroImage}
+              src="/images/rr.jpg"
+              alt="Local retailer in a shop holding a clipboard"
+            />
+            <div className={styles.imageShade} aria-hidden="true" />
+          </div>
 
           <div className={`${styles.infoCard} ${styles.topCard}`}>
             <span className={styles.cardIcon} aria-hidden="true">
@@ -98,6 +102,7 @@ export default function Hero() {
           </div>
         </div>
       </div>
+
     </section>
   );
 }

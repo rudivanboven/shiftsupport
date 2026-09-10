@@ -5,14 +5,6 @@ import { createServerClient } from "@supabase/ssr";
 const WORKER_AREA = /^\/worker\/(dashboard|available-shifts|my-shifts|notifications|profile)/;
 const RETAILER_AREA = /^\/retailer\/(dashboard|shifts|applicants|store|profile)/;
 
-/** Auth screens a signed-in user should be bounced away from. */
-const AUTH_PAGES = new Set([
-  "/worker/login",
-  "/worker/signup",
-  "/retailer/login",
-  "/retailer/signup",
-]);
-
 /**
  * Refreshes the Supabase session cookie on every request, then applies a
  * first line of role-based routing.
@@ -97,7 +89,5 @@ export async function updateSession(request: NextRequest) {
 
   if (WORKER_AREA.test(path) && role === "retailer") return go("/retailer/dashboard");
   if (RETAILER_AREA.test(path) && role === "worker") return go("/worker/dashboard");
-  if (AUTH_PAGES.has(path)) return go(homeFor(role));
-
   return response;
 }

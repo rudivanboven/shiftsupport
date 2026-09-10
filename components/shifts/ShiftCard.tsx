@@ -69,6 +69,7 @@ export default function ShiftCard({
   };
 
   const pay = totalPay(shift.hourly_rate, shift.duration);
+  const location = shift.shift_location ?? storeAddress ?? contact?.store_address;
   const accentClass =
     accent === "muted"
       ? styles.accentMuted
@@ -87,7 +88,6 @@ export default function ShiftCard({
             <p className={styles.store}>
               <IconStore width={14} height={14} />
               {storeName}
-              {storeAddress ? ` · ${storeAddress}` : ""}
             </p>
           ) : null}
         </div>
@@ -96,6 +96,16 @@ export default function ShiftCard({
 
       {shift.description ? (
         <p className={styles.description}>{shift.description}</p>
+      ) : null}
+
+      {location ? (
+        <div className={styles.location}>
+          <IconPin width={17} height={17} />
+          <span>
+            <span className={styles.locationLabel}>Shift location</span>
+            <span className={styles.locationValue}>{location}</span>
+          </span>
+        </div>
       ) : null}
 
       <div className={styles.meta}>

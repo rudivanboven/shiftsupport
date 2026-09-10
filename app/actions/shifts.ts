@@ -36,15 +36,17 @@ export async function createShift(
 ): Promise<FormState> {
   const taskType = str(formData.get("taskType"));
   const description = str(formData.get("description"));
+  const shiftLocation = str(formData.get("shiftLocation"));
   const date = str(formData.get("date"));
   const startTime = str(formData.get("startTime"));
   const endTime = str(formData.get("endTime"));
   const hourlyRate = str(formData.get("hourlyRate"));
 
-  const values = { taskType, description, date, startTime, endTime, hourlyRate };
+  const values = { taskType, description, shiftLocation, date, startTime, endTime, hourlyRate };
   const fieldErrors: FieldErrors = {};
 
   if (!taskType) fieldErrors.taskType = "Tell workers what the shift involves.";
+  if (!shiftLocation) fieldErrors.shiftLocation = "Enter the location for this shift.";
   if (!date) fieldErrors.date = "Pick a date.";
   else if (!DATE_RE.test(date)) fieldErrors.date = "Enter a valid date.";
   if (!startTime) fieldErrors.startTime = "Pick a start time.";
@@ -93,6 +95,7 @@ export async function createShift(
       store_id: resolved.storeId,
       task_type: taskType,
       description: description || null,
+      shift_location: shiftLocation,
       start_time: start,
       end_time: end,
       duration,

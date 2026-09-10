@@ -15,7 +15,7 @@ export default async function PostShiftPage() {
         title="Post a shift"
         description="Tell workers what you need and when. You'll get applications from people nearby, and you choose who works it."
       />
-      <PostShiftForm storeName={store.name} />
+      <PostShiftForm storeName={store.name} storeAddress={store.address ?? ""} />
     </>
   );
 }

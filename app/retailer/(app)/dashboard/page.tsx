@@ -125,6 +125,7 @@ export default async function RetailerDashboardPage() {
                       <ShiftCard
                         key={shift.id}
                         shift={shift}
+                        storeAddress={store.address}
                         applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
                         accent={shift.status === "open" ? "green" : "muted"}
                         actions={

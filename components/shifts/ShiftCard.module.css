@@ -90,6 +90,43 @@
   overflow: hidden;
 }
 
+.location {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 14px 20px 0;
+  padding: 11px 13px;
+  border: 1px solid var(--brand-green-shadow);
+  border-radius: 14px;
+  background: var(--brand-green-tint);
+  color: var(--brand-green);
+}
+
+.location > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.locationLabel {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 10.5px;
+  font-weight: var(--w-semibold);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.locationValue {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 13.5px;
+  font-weight: var(--w-medium);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .meta {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -29,10 +29,17 @@ const TASK_SUGGESTIONS = [
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function PostShiftForm({ storeName }: { storeName: string }) {
+export default function PostShiftForm({
+  storeName,
+  storeAddress,
+}: {
+  storeName: string;
+  storeAddress: string;
+}) {
   const [state, formAction] = useActionState<FormState, FormData>(createShift, {});
 
   const [taskType, setTaskType] = useState("");
+  const [shiftLocation, setShiftLocation] = useState(storeAddress);
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -132,6 +139,17 @@ export default function PostShiftForm({ storeName }: { storeName: string }) {
             />
 
             <Input
+              label="📍 Shift location"
+              name="shiftLocation"
+              placeholder="Enter shift location"
+              hint="Using your store address. You can change it for this shift."
+              value={shiftLocation}
+              error={state.fieldErrors?.shiftLocation}
+              onChange={(event) => setShiftLocation(event.target.value)}
+              required
+            />
+
+            <Input
               label="Date"
               name="date"
               type="date"
@@ -199,6 +217,10 @@ export default function PostShiftForm({ storeName }: { storeName: string }) {
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>Task</span>
             <span className={styles.summaryValue}>{taskType || "—"}</span>
+          </div>
+          <div className={`${styles.summaryRow} ${styles.locationRow}`}>
+            <span className={styles.summaryLabel}>📍 Location</span>
+            <span className={styles.summaryValue}>{shiftLocation || "—"}</span>
           </div>
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>Date</span>

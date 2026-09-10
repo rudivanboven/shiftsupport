@@ -60,6 +60,7 @@ export interface Shift {
   store_id: string;
   task_type: string;
   description: string | null;
+  shift_location: string | null;
   start_time: string;
   end_time: string;
   duration: number;

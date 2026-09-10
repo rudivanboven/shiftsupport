@@ -19,7 +19,7 @@ column is removed, and re-running them is safe.
 | --- | --- |
 | `profiles` | Adds `email`, `phone`, `avatar_url`, `updated_at`. Links `profiles.id → auth.users.id`. Constrains `role` to `worker` / `retailer` / `admin`. |
 | `workers` | Adds `auth_user_id → auth.users(id)`, `email`, `updated_at`. Makes the legacy `memberstack_id` **nullable** so new signups can be inserted — existing values are untouched. |
-| `store_users` | Adds `auth_user_id → auth.users(id)`, `updated_at`. Defaults `role` to `owner`. |
+| `store_users` | Adds `auth_user_id → auth.users(id)`, `updated_at`. Makes legacy `memberstack_id` nullable and defaults `role` to `owner`. |
 | `stores` | Adds `updated_at`. |
 | `shifts` | Adds `description`, `created_by`, `updated_at`, plus indexes on `store_id` / `status` / `accepted_by` / `start_time`. |
 | `shift_applications` | Adds a **unique index on (shift_id, worker_id)** so a worker cannot apply twice. Defaults `status` to `pending`. |

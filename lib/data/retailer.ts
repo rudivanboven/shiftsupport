@@ -15,7 +15,7 @@ export interface ApplicationWithContext extends ShiftApplication {
 }
 
 const SHIFT_COLUMNS =
-  "id,store_id,task_type,description,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at";
+  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at";
 
 /** Every shift belonging to the retailer's store, soonest first. */
 export async function getStoreShifts(storeId: string, limit?: number) {

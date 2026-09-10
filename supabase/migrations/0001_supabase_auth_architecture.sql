@@ -39,7 +39,7 @@ begin
   ) then
     alter table public.profiles
       add constraint profiles_id_fkey
-      foreign key (id) references auth.users(id) on delete cascade;
+      foreign key (id) references auth.users(id) on delete cascade not valid;
   end if;
 end $$;
 
@@ -94,6 +94,7 @@ alter table public.store_users
 
 alter table public.store_users alter column created_at set default now();
 alter table public.store_users alter column role       set default 'owner';
+alter table public.store_users alter column memberstack_id drop not null; -- legacy data kept
 
 do $$
 begin

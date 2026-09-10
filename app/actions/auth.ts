@@ -77,7 +77,10 @@ async function setRole(userId: string, role: UserRole) {
   const admin = createAdminClient();
   // app_metadata is signed into the JWT and is NOT user-writable —
   // middleware reads it for fast role routing.
-  await admin.auth.admin.updateUserById(userId, { app_metadata: { role } });
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    app_metadata: { role },
+  });
+  if (error) throw error;
 }
 
 async function provisionWorker(input: {
@@ -328,11 +331,20 @@ async function signIn(
 
   if (error) return { error: friendlyAuthError(error), values };
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", data.user.id)
     .maybeSingle();
+
+  if (profileError) {
+    console.error("[signIn] profile lookup failed", profileError);
+    await supabase.auth.signOut();
+    return {
+      error: "We couldn't load your account profile. Please try again or contact support.",
+      values,
+    };
+  }
 
   const role = (profile?.role as UserRole | undefined) ?? null;
 

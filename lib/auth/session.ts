@@ -51,11 +51,15 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
   if (!user) return null;
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load your account profile: ${error.message}`);
+  }
 
   return (data as Profile) ?? null;
 });
@@ -75,11 +79,15 @@ export async function requireWorker(): Promise<WorkerAccount> {
   const supabase = await createClient();
   // `workers` has column-level privileges (phone/email are protected), so the
   // readable columns are listed explicitly rather than using `*`.
-  const { data: worker } = await supabase
+  const { data: worker, error: workerError } = await supabase
     .from("workers")
     .select("id,auth_user_id,memberstack_id,full_name,created_at")
     .eq("auth_user_id", user.id)
     .maybeSingle();
+
+  if (workerError) {
+    throw new Error(`Unable to load your worker account: ${workerError.message}`);
+  }
 
   if (!worker) redirect("/worker/login?error=missing_worker");
 
@@ -99,17 +107,24 @@ export async function requireRetailer(): Promise<RetailerAccount> {
   if (profile.role !== "retailer") redirect(dashboardPathFor(profile.role));
 
   const supabase = await createClient();
-  const { data: storeUser } = await supabase
+  const { data: storeUser, error: storeUserError } = await supabase
     .from("store_users")
     .select("*")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
+  if (storeUserError) {
+    throw new Error(`Unable to load your retailer account: ${storeUserError.message}`);
+  }
+
   if (!storeUser) redirect("/retailer/login?error=missing_store");
 
   // contact_phone is column-protected, so the store is read through the
   // SECURITY DEFINER function that only returns the caller's own store.
-  const { data: stores } = await supabase.rpc("get_my_store");
+  const { data: stores, error: storeError } = await supabase.rpc("get_my_store");
+  if (storeError) {
+    throw new Error(`Unable to load your store: ${storeError.message}`);
+  }
   const store = (stores as Store[] | null)?.[0];
 
   if (!store) redirect("/retailer/login?error=missing_store");
