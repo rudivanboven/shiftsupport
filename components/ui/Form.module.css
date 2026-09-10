@@ -34,6 +34,18 @@
   align-items: center;
 }
 
+.leadingIcon {
+  position: absolute;
+  left: 14px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  color: rgba(46, 123, 60, .68);
+  pointer-events: none;
+}
+
+.leadingIcon svg { display: block; }
+
 .input,
 .textarea,
 .select {
@@ -156,6 +168,8 @@
 .withReveal {
   padding-right: 50px;
 }
+
+.withLeading { padding-left: 43px; }
 
 /* strength meter */
 

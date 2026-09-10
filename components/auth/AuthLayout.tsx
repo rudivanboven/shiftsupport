@@ -11,6 +11,7 @@ interface AuthLayoutProps {
   subtitle: string;
   children: ReactNode;
   footer?: ReactNode;
+  wide?: boolean;
 }
 
 const Tick = () => (
@@ -37,9 +38,10 @@ export default function AuthLayout({
   subtitle,
   children,
   footer,
+  wide = false,
 }: AuthLayoutProps) {
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${wide ? styles.pageWide : ""}`}>
       <aside className={styles.aside}>
         <div className={styles.asideTop}>
           <a href="/" className={styles.logo} aria-label="ShiftSupport — home">
@@ -67,7 +69,7 @@ export default function AuthLayout({
       </aside>
 
       <main className={styles.main}>
-        <div className={styles.card}>
+        <div className={`${styles.card} ${wide ? styles.cardWide : ""}`}>
           <a href="/" className={styles.mobileLogo} aria-label="ShiftSupport — home">
             <img src="/images/logobalck.png" alt="ShiftSupport" />
           </a>

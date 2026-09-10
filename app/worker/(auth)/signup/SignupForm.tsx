@@ -10,6 +10,12 @@ import {
   SubmitButton,
 } from "@/components/ui/Form";
 import type { FormState } from "@/lib/validation";
+import {
+  AuthLockIcon,
+  AuthMailIcon,
+  AuthPhoneIcon,
+  AuthUserIcon,
+} from "@/components/auth/AuthFieldIcons";
 
 export default function WorkerSignupForm() {
   const [state, formAction] = useActionState<FormState, FormData>(signUpWorker, {});
@@ -20,6 +26,7 @@ export default function WorkerSignupForm() {
         {state.error ? <Alert tone="error">{state.error}</Alert> : null}
 
         <Input
+          leadingIcon={<AuthUserIcon />}
           label="Full name"
           name="fullName"
           autoComplete="name"
@@ -30,6 +37,7 @@ export default function WorkerSignupForm() {
         />
 
         <Input
+          leadingIcon={<AuthMailIcon />}
           label="Email address"
           name="email"
           type="email"
@@ -41,6 +49,7 @@ export default function WorkerSignupForm() {
         />
 
         <Input
+          leadingIcon={<AuthPhoneIcon />}
           label="Phone number"
           name="phone"
           type="tel"
@@ -53,6 +62,7 @@ export default function WorkerSignupForm() {
         />
 
         <PasswordInput
+          leadingIcon={<AuthLockIcon />}
           label="Password"
           name="password"
           autoComplete="new-password"
@@ -63,6 +73,7 @@ export default function WorkerSignupForm() {
         />
 
         <PasswordInput
+          leadingIcon={<AuthLockIcon shield />}
           label="Confirm password"
           name="confirmPassword"
           autoComplete="new-password"

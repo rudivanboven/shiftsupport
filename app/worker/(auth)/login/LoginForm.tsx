@@ -10,6 +10,7 @@ import {
   SubmitButton,
 } from "@/components/ui/Form";
 import type { FormState } from "@/lib/validation";
+import { AuthLockIcon, AuthMailIcon } from "@/components/auth/AuthFieldIcons";
 import styles from "@/components/auth/AuthLayout.module.css";
 
 export default function WorkerLoginForm({ next }: { next?: string }) {
@@ -23,6 +24,7 @@ export default function WorkerLoginForm({ next }: { next?: string }) {
         <input type="hidden" name="next" value={next ?? ""} />
 
         <Input
+          leadingIcon={<AuthMailIcon />}
           label="Email address"
           name="email"
           type="email"
@@ -34,6 +36,7 @@ export default function WorkerLoginForm({ next }: { next?: string }) {
         />
 
         <PasswordInput
+          leadingIcon={<AuthLockIcon />}
           label="Password"
           name="password"
           autoComplete="current-password"

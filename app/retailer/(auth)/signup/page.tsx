@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 export default function RetailerSignupPage() {
   return (
     <AuthLayout
+      wide
       badge="For retailers"
       asideTitle="Staff your busiest hours, not your whole week."
       asideText="Set up your store once. From then on, posting a shift takes a minute and you choose exactly who works it."

@@ -91,17 +91,23 @@ type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id"> & {
   error?: string;
   hint?: string;
   optional?: boolean;
+  leadingIcon?: ReactNode;
 };
 
-export function Input({ label, error, hint, optional, ...rest }: InputProps) {
+export function Input({ label, error, hint, optional, leadingIcon, ...rest }: InputProps) {
   return (
     <FieldShell label={label} error={error} hint={hint} optional={optional}>
       {({ id, describedBy, invalid }) => (
         <div className={styles.inputWrap}>
+          {leadingIcon ? (
+            <span className={styles.leadingIcon} aria-hidden="true">
+              {leadingIcon}
+            </span>
+          ) : null}
           <input
             {...rest}
             id={id}
-            className={styles.input}
+            className={`${styles.input} ${leadingIcon ? styles.withLeading : ""}`}
             aria-describedby={describedBy}
             aria-invalid={invalid || undefined}
           />
@@ -187,6 +193,7 @@ export function PasswordInput({
   error,
   hint,
   showStrength = false,
+  leadingIcon,
   onChange,
   ...rest
 }: PasswordProps) {
@@ -199,11 +206,16 @@ export function PasswordInput({
       {({ id, describedBy, invalid }) => (
         <>
           <div className={styles.inputWrap}>
+            {leadingIcon ? (
+              <span className={styles.leadingIcon} aria-hidden="true">
+                {leadingIcon}
+              </span>
+            ) : null}
             <input
               {...rest}
               id={id}
               type={visible ? "text" : "password"}
-              className={`${styles.input} ${styles.withReveal}`}
+              className={`${styles.input} ${styles.withReveal} ${leadingIcon ? styles.withLeading : ""}`}
               aria-describedby={describedBy}
               aria-invalid={invalid || undefined}
               onChange={(event) => {
