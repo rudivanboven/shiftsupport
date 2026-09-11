@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { priceShift, shiftWindow } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
 import { type FieldErrors, type FormState, str } from "@/lib/validation";
 
@@ -40,9 +41,11 @@ export async function createShift(
   const date = str(formData.get("date"));
   const startTime = str(formData.get("startTime"));
   const endTime = str(formData.get("endTime"));
-  const hourlyRate = str(formData.get("hourlyRate"));
+  // Note: any `hourlyRate` in the payload is deliberately not read. The rate a
+  // retailer pays is set by the platform, so it comes from `priceShift` below
+  // and a tampered form cannot post a shift at some other price.
 
-  const values = { taskType, description, shiftLocation, date, startTime, endTime, hourlyRate };
+  const values = { taskType, description, shiftLocation, date, startTime, endTime };
   const fieldErrors: FieldErrors = {};
 
   if (!taskType) fieldErrors.taskType = "Tell workers what the shift involves.";
@@ -54,36 +57,25 @@ export async function createShift(
   if (!endTime) fieldErrors.endTime = "Pick an end time.";
   else if (!TIME_RE.test(endTime)) fieldErrors.endTime = "Enter a valid time.";
 
-  const rate = hourlyRate ? Number(hourlyRate) : null;
-  if (hourlyRate && (Number.isNaN(rate) || rate! <= 0)) {
-    fieldErrors.hourlyRate = "Enter an hourly rate above zero.";
-  }
-
   if (Object.keys(fieldErrors).length) return { fieldErrors, values };
 
   // Stored as wall-clock times at the store, matching the existing data.
   const start = `${date}T${startTime}:00`;
-  const startMs = new Date(`${date}T${startTime}:00`).getTime();
-  let endMs = new Date(`${date}T${endTime}:00`).getTime();
+  const slot = shiftWindow(date, startTime, endTime);
 
-  // An end time earlier than the start means the shift runs past midnight.
-  let endDate = date;
-  if (endMs <= startMs) {
-    const next = new Date(`${date}T00:00:00`);
-    next.setDate(next.getDate() + 1);
-    endDate = next.toISOString().slice(0, 10);
-    endMs = new Date(`${endDate}T${endTime}:00`).getTime();
-  }
-
-  const end = `${endDate}T${endTime}:00`;
-  const duration = Math.round(((endMs - startMs) / 3_600_000) * 100) / 100;
-
-  if (duration <= 0) {
+  if (!slot) {
     return { fieldErrors: { endTime: "The shift must be longer than zero hours." }, values };
   }
-  if (duration > 24) {
+  if (slot.hours > 24) {
     return { fieldErrors: { endTime: "A single shift can't be longer than 24 hours." }, values };
   }
+
+  const end = `${slot.endDate}T${endTime}:00`;
+  const duration = slot.hours;
+
+  // Priced here, from the times the server just validated — never from the
+  // browser. `retailerTotal` is what the future payment flow will charge.
+  const pricing = priceShift(duration);
 
   const resolved = await resolveStoreId();
   if ("error" in resolved) return { error: resolved.error, values };
@@ -99,7 +91,7 @@ export async function createShift(
       start_time: start,
       end_time: end,
       duration,
-      hourly_rate: rate,
+      hourly_rate: pricing.hourlyRate,
       status: "open",
       created_by: resolved.userId,
     })

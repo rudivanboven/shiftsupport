@@ -14,6 +14,7 @@ import { buttonClass } from "@/components/ui/buttonClass";
 import { Panel } from "@/components/ui/Kit";
 import { IconCheck } from "@/components/dashboard/Icons";
 import { formatDate, formatDuration } from "@/lib/format";
+import { RETAILER_HOURLY_RATE, priceShift, shiftWindow } from "@/lib/pricing";
 import type { FormState } from "@/lib/validation";
 import styles from "./PostShiftForm.module.css";
 
@@ -51,28 +52,19 @@ export default function PostShiftForm({
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [rate, setRate] = useState("");
 
+  // Duration drives the estimate: as soon as the date and both times are
+  // valid, the cost is duration x the fixed platform rate. The retailer never
+  // types either number.
   const { duration, total, overnight } = useMemo(() => {
-    if (!date || !startTime || !endTime) {
-      return { duration: null, total: null, overnight: false };
-    }
-    const startMs = new Date(`${date}T${startTime}:00`).getTime();
-    let endMs = new Date(`${date}T${endTime}:00`).getTime();
-    const isOvernight = endMs <= startMs;
-    if (isOvernight) endMs += 24 * 3_600_000;
-
-    const hours = Math.round(((endMs - startMs) / 3_600_000) * 100) / 100;
-    const numericRate = Number(rate);
+    const slot = shiftWindow(date, startTime, endTime);
+    if (!slot) return { duration: null, total: null, overnight: false };
     return {
-      duration: Number.isFinite(hours) && hours > 0 ? hours : null,
-      total:
-        rate && Number.isFinite(numericRate) && numericRate > 0 && hours > 0
-          ? hours * numericRate
-          : null,
-      overnight: isOvernight,
+      duration: slot.hours,
+      total: priceShift(slot.hours).retailerTotal,
+      overnight: slot.overnight,
     };
-  }, [date, startTime, endTime, rate]);
+  }, [date, startTime, endTime]);
 
   if (state.success) {
     return (
@@ -189,20 +181,17 @@ export default function PostShiftForm({
               />
             </FormRow>
 
-            <Input
-              label="Hourly rate ($)"
-              name="hourlyRate"
-              type="number"
-              min="0"
-              step="0.50"
-              inputMode="decimal"
-              placeholder="15.00"
-              hint="Shown on the shift card. Leave blank to discuss it with the worker."
-              defaultValue={state.values?.hourlyRate}
-              error={state.fieldErrors?.hourlyRate}
-              onChange={(e) => setRate(e.target.value)}
-              optional
-            />
+            <div className={styles.rateCard}>
+              <span className={styles.rateLabel}>Hourly rate</span>
+              <p className={styles.rateValue}>
+                {formatUsd(RETAILER_HOURLY_RATE)}
+                <span className={styles.rateUnit}> / hour</span>
+              </p>
+              <p className={styles.rateNote}>
+                Fixed ShiftSupport rate. It is the same on every shift and is set when
+                your shift is posted.
+              </p>
+            </div>
 
             <SubmitButton pendingLabel="Posting your shift…">
               Post shift <span aria-hidden="true">→</span>
@@ -252,7 +241,7 @@ export default function PostShiftForm({
           <div className={styles.summaryRow}>
             <span className={styles.summaryLabel}>Rate</span>
             <span className={styles.summaryValue}>
-              {rate ? `${formatUsd(Number(rate))}/hr` : "On request"}
+              {`${formatUsd(RETAILER_HOURLY_RATE)}/hr`}
             </span>
           </div>
         </div>
@@ -266,7 +255,10 @@ export default function PostShiftForm({
 
         <ul className={styles.tips}>
           <li>Shifts posted a few days ahead attract the most applicants.</li>
-          <li>A clear rate gets a faster response than &ldquo;on request&rdquo;.</li>
+          <li>
+            Every shift is charged at the fixed {formatUsd(RETAILER_HOURLY_RATE)}/hr
+            ShiftSupport rate, so there is no rate to negotiate.
+          </li>
           <li>
             Your store phone number stays private until you hire someone for the shift.
           </li>

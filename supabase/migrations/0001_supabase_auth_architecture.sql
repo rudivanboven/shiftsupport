@@ -1,3 +1,4 @@
+hanges
 -- ============================================================================
 --  ShiftSupport — Migration 0001
 --  Memberstack  ->  Supabase Auth
