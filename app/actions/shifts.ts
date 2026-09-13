@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { priceShift, shiftWindow } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
@@ -81,6 +82,9 @@ export async function createShift(
   if ("error" in resolved) return { error: resolved.error, values };
 
   const supabase = await createClient();
+  // Created as a draft: a shift is not a marketplace shift until it has been
+  // paid for. The database enforces the same thing — the insert trigger in
+  // migration 0007 pins a session-created shift to `draft` / `unpaid`.
   const { data, error } = await supabase
     .from("shifts")
     .insert({
@@ -92,7 +96,8 @@ export async function createShift(
       end_time: end,
       duration,
       hourly_rate: pricing.hourlyRate,
-      status: "open",
+      status: "draft",
+      payment_status: "unpaid",
       created_by: resolved.userId,
     })
     .select("id")
@@ -112,7 +117,12 @@ export async function createShift(
   revalidatePath("/retailer/dashboard");
   revalidatePath("/retailer/shifts");
 
-  return { success: (data as { id: string }).id };
+  const shiftId = (data as { id: string }).id;
+
+  // Take the retailer to the payment review page, but do not create or open a
+  // Stripe Checkout session here. Checkout starts only from that page's
+  // explicit "Continue to payment" button.
+  redirect(`/retailer/shifts/${shiftId}/payment`);
 }
 
 export async function cancelShift(shiftId: string) {

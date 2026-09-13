@@ -10,6 +10,7 @@ import NotificationBell from "./NotificationBell";
 import {
   IconBell,
   IconCalendar,
+  IconCash,
   IconClose,
   IconHome,
   IconLogout,
@@ -18,6 +19,7 @@ import {
   IconSearch,
   IconStore,
   IconUser,
+  IconUserCheck,
   IconUsers,
 } from "./Icons";
 import styles from "./DashboardShell.module.css";
@@ -29,8 +31,10 @@ export type NavIcon =
   | "users"
   | "store"
   | "user"
+  | "user-check"
   | "search"
-  | "bell";
+  | "bell"
+  | "cash";
 
 const ICONS: Record<NavIcon, typeof IconHome> = {
   home: IconHome,
@@ -39,8 +43,10 @@ const ICONS: Record<NavIcon, typeof IconHome> = {
   users: IconUsers,
   store: IconStore,
   user: IconUser,
+  "user-check": IconUserCheck,
   search: IconSearch,
   bell: IconBell,
+  cash: IconCash,
 };
 
 export interface NavItem {

@@ -57,6 +57,14 @@ export const IconUser = (p: IconProps) => (
   </svg>
 );
 
+export const IconUserCheck = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="7.8" cy="6.8" r="3" />
+    <path d="M2.5 16.5c0-2.8 2.4-4.5 5.3-4.5 1.2 0 2.3.3 3.2.7" />
+    <path d="m12.3 14.1 1.6 1.6 3.3-3.6" />
+  </svg>
+);
+
 export const IconSearch = (p: IconProps) => (
   <svg {...base(p)}>
     <circle cx="9" cy="9" r="5.4" />

@@ -19,6 +19,7 @@ import {
   formatTime,
   totalPay,
 } from "@/lib/format";
+import { WORKER_HOURLY_RATE } from "@/lib/pricing";
 import type { Shift, StoreContact } from "@/lib/supabase/types";
 import styles from "./ShiftCard.module.css";
 
@@ -45,6 +46,7 @@ function NoticeIcon() {
 }
 
 export const SHIFT_STATUS_LABEL: Record<string, string> = {
+  draft: "Awaiting payment",
   open: "Open",
   filled: "Filled",
   cancelled: "Cancelled",
@@ -52,6 +54,7 @@ export const SHIFT_STATUS_LABEL: Record<string, string> = {
 };
 
 export const SHIFT_STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "pending",
   open: "open",
   filled: "filled",
   cancelled: "cancelled",
@@ -60,6 +63,8 @@ export const SHIFT_STATUS_TONE: Record<string, BadgeTone> = {
 
 interface ShiftCardProps {
   shift: Shift;
+  /** Controls which role-specific rate and earnings language the card displays. */
+  perspective?: "retailer" | "worker";
   storeName?: string | null;
   storeAddress?: string | null;
   badge?: { tone: BadgeTone; label: string };
@@ -79,6 +84,7 @@ interface ShiftCardProps {
 
 export default function ShiftCard({
   shift,
+  perspective = "retailer",
   storeName,
   storeAddress,
   badge,
@@ -95,7 +101,9 @@ export default function ShiftCard({
     label: SHIFT_STATUS_LABEL[status] ?? status,
   };
 
-  const pay = totalPay(shift.hourly_rate, shift.duration);
+  const workerView = perspective === "worker";
+  const displayedRate = workerView ? WORKER_HOURLY_RATE : shift.hourly_rate;
+  const pay = totalPay(displayedRate, shift.duration);
   const location = shift.shift_location ?? storeAddress ?? contact?.store_address;
   const accentClass =
     accent === "muted"
@@ -165,8 +173,8 @@ export default function ShiftCard({
         <div className={styles.metaCell}>
           <IconCash width={16} height={16} className={styles.metaIcon} />
           <span>
-            <span className={styles.metaLabel}>Rate</span>
-            <span className={styles.metaValue}>{formatRate(shift.hourly_rate)}</span>
+            <span className={styles.metaLabel}>{workerView ? "Gross rate" : "Rate"}</span>
+            <span className={styles.metaValue}>{formatRate(displayedRate)}</span>
           </span>
         </div>
       </div>
@@ -228,7 +236,11 @@ export default function ShiftCard({
               {pay === null ? "—" : formatMoney(pay)}
             </span>
             <span className={styles.totalLabel}>
-              {pay === null ? "Rate to be confirmed" : "Estimated total for the shift"}
+              {pay === null
+                ? "Rate to be confirmed"
+                : workerView
+                  ? "Estimated gross"
+                  : "Estimated total for the shift"}
             </span>
           </span>
         </div>

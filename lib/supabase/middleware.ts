@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 /** Dashboard areas that require a signed-in user. */
-const WORKER_AREA = /^\/worker\/(dashboard|available-shifts|my-shifts|notifications|profile)/;
-const RETAILER_AREA = /^\/retailer\/(dashboard|shifts|applicants|store|profile)/;
+const WORKER_AREA = /^\/worker\/(dashboard|available-shifts|my-shifts|notifications|profile|pricing)/;
+const RETAILER_AREA = /^\/retailer\/(dashboard|shifts|applicants|hires|store|profile|pricing)/;
 
 const isProtected = (path: string) => WORKER_AREA.test(path) || RETAILER_AREA.test(path);
 

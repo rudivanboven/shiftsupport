@@ -15,7 +15,7 @@ const mobileLinks = [
 const howItWorksLinks = [
   ["For Workers", "/how-shifts-work#workers"],
   ["For Retailers", "/how-shifts-work#retailers"],
-  ["Pricing Breakdown", "/how-shifts-work#pricing"],
+  ["Employment Support", "/how-shifts-work#support"],
   ["Reviews & Trust", "/how-shifts-work#reviews"],
 ];
 

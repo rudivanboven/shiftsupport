@@ -10,7 +10,7 @@ column is removed, and re-running them is safe.
    project → **SQL Editor** → **New query**.
 2. Paste the whole of `migrations/0001_supabase_auth_architecture.sql`, run it.
 3. Paste the whole of `migrations/0002_hire_and_reject_rpc.sql`, run it.
-4. Then `0003`, `0004` and `0005` in order, the same way.
+4. Then `0003`, `0004`, `0005`, `0006` and `0007` in order, the same way.
 
 (Or, with the CLI linked to this project: `supabase db push`.)
 
@@ -96,3 +96,33 @@ Nothing is migrated or deleted. The existing Memberstack-era rows keep their
 `memberstack_id` values and simply have `auth_user_id = NULL`. If you later want
 to reconnect an old worker to a new Supabase Auth login, set that row's
 `auth_user_id` — no other change is needed.
+
+## What 0007 does
+
+Stripe payments. See `../STRIPE.md` for the setup it belongs to.
+
+| Area | Change |
+| --- | --- |
+| `workers` | Adds `stripe_customer_id`, `stripe_subscription_id`, `membership_status`, `membership_started_at`, `membership_expires_at`, `membership_cancel_at_period_end`, `membership_updated_at`. The two `stripe_*` columns are **not** granted to `authenticated` — only the service role reads them. |
+| `shifts` | Adds `payment_status`, `amount_paid_cents`, `paid_at`, `published_at`, and `draft` as a status. Existing shifts become `payment_status = 'legacy'` and keep working unchanged. |
+| `shift_payments` | New table: one Stripe Checkout payment per shift, readable only by the owning store, written only by the service role. |
+| `stripe_events` | New table: the webhook idempotency ledger, keyed by Stripe event id. RLS on with no policy, so no browser session can reach it. |
+| Trigger | `shifts_enforce_payment_state` pins the payment columns for any non-service-role write and refuses to publish a shift that has not been paid for. |
+| RLS | `shifts_select` only exposes an open shift to the marketplace once it is paid (or legacy). `shift_applications_insert_own` additionally requires `worker_membership_active()`. |
+
+**Before running it:** every existing worker starts with `membership_status =
+'inactive'` and cannot apply for shifts until they subscribe.
+
+## What 0008 does
+
+The one-time backfill that keeps them: every worker who existed before the
+rollout (`created_at` before 2026-09-12, no Stripe customer, status
+`inactive`) becomes `active` with no expiry date, so today's workers keep
+marketplace access without paying. Workers who sign up after that date
+subscribe like everyone else, and a later Stripe event for a grandfathered
+worker replaces the row as normal.
+
+Safe to re-run: the guards mean it can never re-activate a membership that has
+since lapsed or been cancelled. The file also carries a commented-out
+alternative that grants a grace period with a fixed end date instead of
+open-ended access.

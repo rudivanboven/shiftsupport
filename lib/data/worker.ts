@@ -10,7 +10,7 @@ import type {
 } from "@/lib/supabase/types";
 
 const SHIFT_COLUMNS =
-  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at";
+  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at,payment_status";
 
 /** `stores` has column-level privileges: contact_phone is not selectable here. */
 const STORE_COLUMNS = "id,name,address";
@@ -35,6 +35,10 @@ export async function getAvailableShifts() {
     .select(`${SHIFT_COLUMNS},stores(${STORE_COLUMNS})`)
     .eq("status", "open")
     .is("accepted_by", null)
+    // Paid for, or posted before Stripe payments existed. The RLS policy in
+    // migration 0007 applies the same rule, so this is the friendly filter
+    // rather than the security boundary.
+    .in("payment_status", ["paid", "legacy"])
     .order("start_time", { ascending: true });
 
   const shifts = ((data ?? []) as unknown as ShiftWithStore[]).filter(

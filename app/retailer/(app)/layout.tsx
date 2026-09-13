@@ -47,8 +47,15 @@ export default async function RetailerAppLayout({
       ],
     },
     {
+      label: "People",
+      items: [
+        { href: "/retailer/hires", label: "Hires & Decisions", icon: "user-check" },
+      ],
+    },
+    {
       label: "Account",
       items: [
+        { href: "/retailer/pricing", label: "Pricing & Payments", icon: "cash" },
         { href: "/retailer/store", label: "My Store", icon: "store" },
         { href: "/retailer/profile", label: "Profile & Settings", icon: "user" },
       ],

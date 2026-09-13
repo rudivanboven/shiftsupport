@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getMembership } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 
 type Result<T = undefined> =
@@ -34,15 +35,28 @@ export async function applyForShift(shiftId: string): Promise<Result> {
 
   if (!worker) return fail("We couldn't find your worker profile.");
 
+  // Membership is checked here for a clear message, and again by the database:
+  // the INSERT policy on shift_applications calls worker_membership_active(),
+  // so a request that skips this action is refused too.
+  const membership = await getMembership(worker.id as string);
+  if (!membership.active) {
+    return fail(
+      "Activate your Worker Membership to apply for shifts. You can start it from Pricing & Payments.",
+    );
+  }
+
   const { data: shift } = await supabase
     .from("shifts")
-    .select("id,status,accepted_by")
+    .select("id,status,accepted_by,payment_status")
     .eq("id", shiftId)
     .maybeSingle();
 
   if (!shift) return fail("That shift is no longer available.");
   if (shift.accepted_by) return fail("Someone has already been hired for this shift.");
   if (shift.status !== "open") return fail("This shift is no longer open for applications.");
+  if (shift.payment_status && !["paid", "legacy"].includes(shift.payment_status)) {
+    return fail("This shift isn't live yet.");
+  }
 
   const { error } = await supabase.from("shift_applications").insert({
     shift_id: shiftId,

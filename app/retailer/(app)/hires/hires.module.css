@@ -1,0 +1,167 @@
+.tabs {
+  margin: 24px 0 20px;
+}
+
+.paymentSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.paymentSummary > div {
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(214, 239, 146, 0.12);
+}
+
+.paymentSummary dt {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.paymentSummary dd {
+  margin: 6px 0 0;
+  font-family: var(--font-heading);
+  font-size: 21px;
+  font-weight: var(--w-semibold);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+.accountingNote {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.peopleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.personCard {
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(22, 48, 36, 0.045);
+}
+
+.hiredCard {
+  border-top: 4px solid var(--brand-green);
+}
+
+.declinedCard {
+  border-top: 4px solid rgba(22, 48, 36, 0.2);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 19px 20px 16px;
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(22, 48, 36, 0.07);
+  color: var(--muted);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: var(--w-semibold);
+}
+
+.avatarHired {
+  color: #fffdf8;
+  background: var(--brand-green);
+}
+
+.identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.identity h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.identity p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.shiftBlock {
+  margin: 0 20px;
+  padding: 15px 16px;
+  border-radius: 16px;
+  background: rgba(22, 48, 36, 0.035);
+}
+
+.sectionLabel {
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--font-heading);
+  font-size: 10.5px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-green);
+}
+
+.shiftBlock strong {
+  display: block;
+  font-size: 14px;
+}
+
+.shiftBlock p {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 20px 20px;
+}
+
+@media (max-width: 950px) {
+  .paymentSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .peopleGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .paymentSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .cardTop {
+    flex-wrap: wrap;
+  }
+
+  .identity {
+    flex-basis: calc(100% - 60px);
+  }
+}

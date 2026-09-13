@@ -7,7 +7,13 @@
  */
 
 export type UserRole = "worker" | "retailer" | "admin";
-export type ShiftStatus = "open" | "filled" | "cancelled" | "completed";
+/** `draft` is a shift that has been created but not paid for yet. */
+export type ShiftStatus = "draft" | "open" | "filled" | "cancelled" | "completed";
+
+/** `legacy` marks shifts that predate Stripe payments (migration 0007). */
+export type ShiftPaymentStatus = "unpaid" | "pending" | "paid" | "failed" | "legacy";
+
+export type MembershipStatus = "inactive" | "active" | "past_due" | "canceled";
 export type ApplicationStatus = "pending" | "approved" | "rejected";
 
 export interface Profile {
@@ -30,6 +36,15 @@ export interface Worker {
   phone: string | null;
   created_at: string | null;
   updated_at: string;
+  /* Membership state (migration 0007). Written only by Stripe fulfillment;
+     the `stripe_*` columns are not granted to the `authenticated` role. */
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  membership_status?: MembershipStatus;
+  membership_started_at?: string | null;
+  membership_expires_at?: string | null;
+  membership_cancel_at_period_end?: boolean;
+  membership_updated_at?: string | null;
 }
 
 export interface Store {
@@ -75,6 +90,32 @@ export interface Shift {
    */
   completed_at?: string | null;
   created_at: string | null;
+  updated_at: string;
+  /* Payment state (migration 0007). Stripe identifiers live on
+     `shift_payments`, which only the owning store can read. */
+  payment_status?: ShiftPaymentStatus;
+  amount_paid_cents?: number | null;
+  paid_at?: string | null;
+  published_at?: string | null;
+}
+
+/** One Stripe Checkout payment for one shift. */
+export interface ShiftPayment {
+  id: string;
+  shift_id: string;
+  store_id: string;
+  stripe_checkout_session_id: string;
+  stripe_payment_intent_id: string | null;
+  amount_cents: number;
+  currency: string;
+  status: "pending" | "paid" | "failed" | "canceled";
+  hours: number | null;
+  hourly_rate: number | null;
+  worker_gross_cents: number | null;
+  platform_portion_cents: number | null;
+  created_by: string | null;
+  paid_at: string | null;
+  created_at: string;
   updated_at: string;
 }
 

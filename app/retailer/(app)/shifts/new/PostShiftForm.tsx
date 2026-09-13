@@ -73,29 +73,21 @@ export default function PostShiftForm({
           <span className={styles.successIcon}>
             <IconCheck width={28} height={28} />
           </span>
-          <h3 className={styles.successTitle}>Your shift has been posted</h3>
+          <h3 className={styles.successTitle}>Your shift is saved as a draft</h3>
           <p className={styles.successText}>
-            It&apos;s live now and workers nearby can apply straight away. You&apos;ll see
-            applicants appear on your dashboard as they come in.
+            Your shift has been saved as a draft. Complete payment to publish it to
+            eligible workers.
           </p>
           <div className={styles.successActions}>
-            <a className={buttonClass("primary")} href="/retailer/shifts">
+            <a
+              className={buttonClass("primary")}
+              href={`/retailer/shifts/${state.success}/payment`}
+            >
+              Continue to payment
+            </a>
+            <a className={buttonClass("ghost")} href="/retailer/shifts">
               View my shifts
             </a>
-            <a
-              className={buttonClass("ghost")}
-              href={`/retailer/applicants?shift=${state.success}`}
-            >
-              See applicants
-            </a>
-            <button
-              type="button"
-              className={buttonClass("ghost")}
-              // A reload is the cleanest way back to a fresh action state.
-              onClick={() => window.location.reload()}
-            >
-              Post another shift
-            </button>
           </div>
         </div>
       </Panel>
@@ -255,6 +247,10 @@ export default function PostShiftForm({
 
         <ul className={styles.tips}>
           <li>Shifts posted a few days ahead attract the most applicants.</li>
+          <li>
+            Your shift is published once payment is confirmed. You&apos;ll review it before
+            choosing whether to continue to secure Stripe checkout.
+          </li>
           <li>
             Every shift is charged at the fixed {formatUsd(RETAILER_HOURLY_RATE)}/hr
             ShiftSupport rate, so there is no rate to negotiate.

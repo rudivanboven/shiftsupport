@@ -6,6 +6,7 @@ import type {
   PublicWorker,
   Shift,
   ShiftApplication,
+  ShiftPayment,
   WorkerContact,
 } from "@/lib/supabase/types";
 
@@ -15,7 +16,7 @@ export interface ApplicationWithContext extends ShiftApplication {
 }
 
 const SHIFT_COLUMNS =
-  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at";
+  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at,payment_status,amount_paid_cents,paid_at,published_at";
 
 /** Every shift belonging to the retailer's store, soonest first. */
 export async function getStoreShifts(storeId: string, limit?: number) {
@@ -60,6 +61,39 @@ export async function getStoreApplications(
   };
 }
 
+/**
+ * The Stripe payment recorded for one shift.
+ *
+ * `shift_payments` is readable only by members of the shift's store (RLS in
+ * migration 0007), and is written only by server-side fulfillment — so what
+ * comes back here is what Stripe confirmed, not what a browser claimed.
+ */
+export async function getShiftPayment(shiftId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("shift_payments")
+    .select("*")
+    .eq("shift_id", shiftId)
+    .maybeSingle();
+
+  return { payment: (data as ShiftPayment | null) ?? null, error: error?.message ?? null };
+}
+
+/** Payments for several shifts at once, keyed by shift id. */
+export async function getShiftPayments(shiftIds: string[]) {
+  if (shiftIds.length === 0) return new Map<string, ShiftPayment>();
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("shift_payments")
+    .select("*")
+    .in("shift_id", shiftIds);
+
+  const byShift = new Map<string, ShiftPayment>();
+  for (const row of (data ?? []) as ShiftPayment[]) byShift.set(row.shift_id, row);
+  return byShift;
+}
+
 export interface RetailerStats {
   activeShifts: number;
   openShifts: number;
@@ -74,7 +108,9 @@ export function summariseShifts(
   const endsInFuture = (s: Shift) => !isPast(s.end_time);
 
   return {
-    activeShifts: shifts.filter((s) => s.status !== "cancelled" && endsInFuture(s)).length,
+    activeShifts: shifts.filter(
+      (s) => s.status !== "cancelled" && s.status !== "draft" && endsInFuture(s),
+    ).length,
     openShifts: shifts.filter((s) => s.status === "open" && !s.accepted_by).length,
     pendingApplications: applications.filter((a) => a.status === "pending").length,
     filledShifts: shifts.filter((s) => Boolean(s.accepted_by)).length,

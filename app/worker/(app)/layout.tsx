@@ -36,7 +36,10 @@ export default async function WorkerAppLayout({ children }: { children: ReactNod
     },
     {
       label: "Account",
-      items: [{ href: "/worker/profile", label: "My Profile", icon: "user" }],
+      items: [
+        { href: "/worker/pricing", label: "Pricing & Payments", icon: "cash" },
+        { href: "/worker/profile", label: "My Profile", icon: "user" },
+      ],
     },
   ];
 

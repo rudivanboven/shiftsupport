@@ -7,6 +7,12 @@
  * this module — the number is never typed into a form or taken from a request.
  */
 
+/** What a worker pays, once, for twelve months of membership. */
+export const WORKER_ANNUAL_MEMBERSHIP = 18;
+
+/** How long a worker membership stays active, in months. */
+export const MEMBERSHIP_MONTHS = 12;
+
 /** What a retailer is charged, per hour, for a shift. */
 export const RETAILER_HOURLY_RATE = 28;
 

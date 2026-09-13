@@ -11,6 +11,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|images/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff|woff2|ttf|eot)$).*)",
+    // `api/stripe/` is excluded on purpose: the Stripe webhook authenticates
+    // itself with a signature, carries no Supabase session, and must not wait
+    // on (or be affected by) a session refresh.
+    "/((?!_next/|api/stripe/|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|images/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|woff|woff2|ttf|eot)$).*)",
   ],
 };

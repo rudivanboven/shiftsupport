@@ -7,6 +7,8 @@ export interface FormState {
   fieldErrors?: FieldErrors;
   success?: string;
   values?: Record<string, string>;
+  /** Where the browser should go next — e.g. a Stripe Checkout URL. */
+  redirectTo?: string;
 }
 
 export const str = (v: FormDataEntryValue | null) =>

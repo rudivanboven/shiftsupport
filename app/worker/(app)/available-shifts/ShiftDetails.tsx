@@ -9,8 +9,8 @@ import {
   formatMoney,
   formatRate,
   formatTime,
-  totalPay,
 } from "@/lib/format";
+import { priceShift, WORKER_HOURLY_RATE } from "@/lib/pricing";
 import type { Shift } from "@/lib/supabase/types";
 import styles from "./details.module.css";
 
@@ -24,7 +24,8 @@ export default function ShiftDetails({
   storeAddress: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const pay = totalPay(shift.hourly_rate, shift.duration);
+  const hours = Number(shift.duration);
+  const gross = Number.isFinite(hours) && hours >= 0 ? priceShift(hours).workerGross : null;
   const location = shift.shift_location ?? storeAddress ?? "Address not provided";
 
   useEffect(() => {
@@ -51,8 +52,8 @@ export default function ShiftDetails({
     ["Start", formatTime(shift.start_time)],
     ["End", formatTime(shift.end_time)],
     ["Duration", formatDuration(shift.duration)],
-    ["Hourly rate", formatRate(shift.hourly_rate)],
-    ["Estimated total", pay === null ? "To be confirmed" : formatMoney(pay)],
+    ["Gross rate", formatRate(WORKER_HOURLY_RATE)],
+    ["Estimated gross", gross === null ? "To be confirmed" : formatMoney(gross)],
   ];
 
   return (

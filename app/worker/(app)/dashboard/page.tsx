@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { displayNameFor, requireWorker } from "@/lib/auth/session";
+import { getMembership } from "@/lib/membership";
+import MembershipLock from "@/components/worker/MembershipLock";
 import {
   getAvailableShifts,
   getContactsForShifts,
@@ -35,6 +37,7 @@ export const metadata: Metadata = { title: "Dashboard | ShiftSupport for workers
 
 export default async function WorkerDashboardPage() {
   const { user, profile, worker } = await requireWorker();
+  const membership = await getMembership(worker.id);
 
   const [{ shifts, error: shiftsError }, { applications, error: appsError }] =
     await Promise.all([getAvailableShifts(), getWorkerApplications(worker.id)]);
@@ -106,8 +109,8 @@ export default async function WorkerDashboardPage() {
           <StatGrid>
             <StatCard
               label="Available shifts"
-              value={stats.available}
-              hint="Open near you right now"
+              value={membership.active ? stats.available : "—"}
+              hint={membership.active ? "Open near you right now" : "Members only"}
               icon={<IconSearch width={17} height={17} />}
             />
             <StatCard
@@ -162,6 +165,7 @@ export default async function WorkerDashboardPage() {
                     <ShiftCard
                       key={application.id}
                       shift={application.shifts!}
+                      perspective="worker"
                       storeName={application.shifts?.stores?.name ?? "A local store"}
                       storeAddress={application.shifts?.stores?.address}
                       badge={{ tone: "approved", label: "You're hired" }}
@@ -174,6 +178,12 @@ export default async function WorkerDashboardPage() {
           ) : null}
 
           <Columns>
+            {!membership.active ? (
+              <MembershipLock
+                membership={membership}
+                title="Activate your Worker Membership to access available shifts"
+              />
+            ) : (
             <Panel
               title="Shifts you might like"
               description="Open shifts you haven't applied for yet."
@@ -197,6 +207,7 @@ export default async function WorkerDashboardPage() {
                     <ShiftCard
                       key={shift.id}
                       shift={shift}
+                      perspective="worker"
                       storeName={shift.stores?.name ?? "A local store"}
                       storeAddress={shift.stores?.address}
                       badge={{ tone: "open", label: "Open" }}
@@ -213,6 +224,7 @@ export default async function WorkerDashboardPage() {
                 </ShiftGrid>
               )}
             </Panel>
+            )}
 
             <Stack>
               <Panel title="Quick actions" description="Get to the useful bits fast.">

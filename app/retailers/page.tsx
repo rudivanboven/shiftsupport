@@ -37,6 +37,15 @@ const responsibilityColumns = [
   ["SHIFTSUPPORT HANDLES", "W-2 employment structure", "Payroll", "Payroll taxes", "Workers’ compensation", "Employment compliance"],
 ];
 
+const valueCards: [string, string, string][] = [
+  ["calendar", "Create Shifts Around Your Needs", "Set the date, the hours and the tasks so the shift matches the staffing gap you actually have."],
+  ["store", "Simple Shift Posting", "Add the shift details, confirm the location, and publish through a short, clear process."],
+  ["people", "Local Workers", "Reach people in your own neighbourhood who are looking for short, flexible retail work."],
+  ["profile", "Manage Applicants in One Place", "Review who applied, compare their history, and hire the person you want from your dashboard."],
+  ["clock", "Shift Location and Scheduling", "Every shift carries its own address and time window, so everyone knows where to be and when."],
+  ["shield", "ShiftSupport Handles the Employment Model", "W-2 structure, payroll, payroll taxes, workers’ compensation and employment compliance."],
+];
+
 const localPoints = [
   ["clock", "PEAK HOURS", "Extra help when traffic picks up."],
   ["people", "CALL-OUTS", "Coverage when someone can’t make it."],
@@ -86,9 +95,9 @@ export default function RetailersPage() {
                 <h1><span>Fill Shifts.</span><br />Without the Hiring Headache.</h1>
                 <p className={styles.lead}>Reliable local help for the hours you actually need.</p>
                 <p>ShiftSupport helps local retailers cover short staffing gaps without taking on payroll, workers’ compensation, or employment administration.</p>
-                <div className={styles.pricing}>
-                  <div><strong>$9.99</strong><span>to place a shift</span></div>
-                  <div><strong>$28<span>/hour</span></strong><span>all-in rate</span></div>
+                <div className={styles.heroHighlights}>
+                  <div><span className={styles.highlightIcon}><Icon name="clock" /></span><strong>Reliable local help</strong><span>Cover the hours you actually need.</span></div>
+                  <div><span className={styles.highlightIcon}><Icon name="shield" /></span><strong>We handle the employment model</strong><span>Payroll, workers&rsquo; compensation and compliance.</span></div>
                 </div>
                 <div className={styles.heroActions}>
                   <div><small>New to ShiftSupport?</small><a className={`headingFont ${styles.solidButton}`} href="/retailer/signup">Create Retailer Account <span aria-hidden="true">→</span></a></div>
@@ -130,6 +139,24 @@ export default function RetailersPage() {
               {steps.map(([number, icon, title, text]) => <article className={styles.step} key={number}>
                 <span className={styles.stepNumber}>{number}</span><span className={styles.stepIcon}><Icon name={icon} /></span><h3>{title}</h3><p>{text}</p>
               </article>)}
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.valueSection} id="value">
+          <div className="container">
+            <div className={styles.centerHeading}>
+              <Eyebrow>WHAT YOU GET</Eyebrow>
+              <h2>Built Around How<br />Local Stores Actually Staff.</h2>
+            </div>
+            <div className={styles.valueGrid}>
+              {valueCards.map(([icon, title, text]) => (
+                <article className={styles.valueCard} key={title}>
+                  <span className={styles.valueIcon}><Icon name={icon} /></span>
+                  <h3>{title}</h3>
+                  <p>{text}</p>
+                </article>
+              ))}
             </div>
           </div>
         </section>

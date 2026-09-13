@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { requireWorker } from "@/lib/auth/session";
+import { getMembership } from "@/lib/membership";
+import MembershipLock from "@/components/worker/MembershipLock";
 import { getAvailableShifts, getWorkerApplications } from "@/lib/data/worker";
 import { EmptyState, ErrorState, PageHeader, Panel } from "@/components/ui/Kit";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
@@ -19,7 +21,24 @@ export default async function AvailableShiftsPage({
   searchParams: Promise<{ sort?: string }>;
 }) {
   const { worker } = await requireWorker();
+  const membership = await getMembership(worker.id);
   const params = await searchParams;
+
+  // No active membership, no marketplace: the shifts are not fetched at all,
+  // so there is nothing in the page for a locked-out worker to read.
+  if (!membership.active) {
+    return (
+      <>
+        <PageHeader
+          eyebrow="Open shifts"
+          title="Available shifts"
+          description="Shift opportunities from local retailers, open to members."
+        />
+        <MembershipLock membership={membership} />
+      </>
+    );
+  }
+
   const sort: Sort = (["soonest", "pay", "newest"] as const).includes(params.sort as Sort)
     ? (params.sort as Sort)
     : "soonest";
@@ -82,6 +101,7 @@ export default async function AvailableShiftsPage({
             <ShiftCard
               key={shift.id}
               shift={shift}
+              perspective="worker"
               storeName={shift.stores?.name ?? "A local store"}
               storeAddress={shift.stores?.address}
               badge={{ tone: "open", label: "Open" }}

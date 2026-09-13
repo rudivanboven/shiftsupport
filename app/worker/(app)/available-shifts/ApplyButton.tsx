@@ -9,14 +9,25 @@ import { IconCheck } from "@/components/dashboard/Icons";
 export default function ApplyButton({
   shiftId,
   alreadyApplied,
+  membershipActive = true,
 }: {
   shiftId: string;
   alreadyApplied: boolean;
+  /** Presentation only — `applyForShift` and RLS enforce this for real. */
+  membershipActive?: boolean;
 }) {
   const [applied, setApplied] = useState(alreadyApplied);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+
+  if (!membershipActive) {
+    return (
+      <a className={buttonClass("primary", { small: true })} href="/worker/pricing">
+        Activate membership to apply
+      </a>
+    );
+  }
 
   if (applied) {
     return (

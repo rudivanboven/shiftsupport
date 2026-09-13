@@ -165,6 +165,7 @@ export default async function WorkerMyShiftsPage({
               <ShiftCard
                 key={application.id}
                 shift={shift}
+                perspective="worker"
                 storeName={shift.stores?.name ?? "A local store"}
                 storeAddress={shift.stores?.address}
                 badge={badge}

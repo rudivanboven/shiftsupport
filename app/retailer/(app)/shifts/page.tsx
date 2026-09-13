@@ -16,14 +16,18 @@ import { isPast } from "@/lib/format";
 import type { Shift } from "@/lib/supabase/types";
 import ShiftReviewBlock from "@/components/reviews/ShiftReviewBlock";
 import CancelShiftButton from "./ShiftActions";
+import PayShiftButton from "./[id]/payment/PayShiftButton";
 
 export const metadata: Metadata = { title: "My shifts | ShiftSupport" };
 
-type Filter = "all" | "open" | "filled" | "past";
+type Filter = "all" | "unpaid" | "open" | "filled" | "past";
 
 const matches = (shift: Shift, filter: Filter) => {
   const past = isPast(shift.end_time);
   switch (filter) {
+    case "unpaid":
+      // Created but not paid for yet, so not visible to workers.
+      return shift.status === "draft";
     case "open":
       return shift.status === "open" && !shift.accepted_by && !past;
     case "filled":
@@ -42,7 +46,7 @@ export default async function RetailerShiftsPage({
 }) {
   const { store } = await requireRetailer();
   const params = await searchParams;
-  const filter: Filter = (["all", "open", "filled", "past"] as const).includes(
+  const filter: Filter = (["all", "unpaid", "open", "filled", "past"] as const).includes(
     params.filter as Filter,
   )
     ? (params.filter as Filter)
@@ -67,6 +71,7 @@ export default async function RetailerShiftsPage({
   const tabs: TabItem[] = (
     [
       ["all", "All shifts"],
+      ["unpaid", "Awaiting payment"],
       ["open", "Open"],
       ["filled", "Filled"],
       ["past", "Past & cancelled"],
@@ -138,7 +143,9 @@ export default async function RetailerShiftsPage({
                 applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
                 accent={cancelled || past ? "muted" : shift.accepted_by ? "peach" : "green"}
                 badge={
-                  cancelled
+                  shift.status === "draft"
+                    ? { tone: "pending", label: "Awaiting payment" }
+                    : cancelled
                     ? { tone: "cancelled", label: "Cancelled" }
                     : shift.status === "completed"
                       ? { tone: "neutral", label: "Completed" }
@@ -159,17 +166,41 @@ export default async function RetailerShiftsPage({
                   ) : null
                 }
                 actions={
-                  <>
-                    <a
-                      className={buttonClass("ghost", { small: true })}
-                      href={`/retailer/applicants?shift=${shift.id}`}
-                    >
-                      Applicants
-                    </a>
-                    {!cancelled && !past ? (
-                      <CancelShiftButton shiftId={shift.id} />
-                    ) : null}
-                  </>
+                  shift.status === "draft" ? (
+                    <>
+                      <PayShiftButton
+                        shiftId={shift.id}
+                        label="Pay & publish"
+                        variant="primary"
+                        small
+                      />
+                      <a
+                        className={buttonClass("ghost", { small: true })}
+                        href={`/retailer/shifts/${shift.id}/payment`}
+                      >
+                        Shift summary
+                      </a>
+                      {!cancelled ? <CancelShiftButton shiftId={shift.id} /> : null}
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        className={buttonClass("ghost", { small: true })}
+                        href={`/retailer/applicants?shift=${shift.id}`}
+                      >
+                        Applicants
+                      </a>
+                      <a
+                        className={buttonClass("ghost", { small: true })}
+                        href={`/retailer/shifts/${shift.id}/payment`}
+                      >
+                        {shift.payment_status === "paid" ? "Receipt" : "Shift summary"}
+                      </a>
+                      {!cancelled && !past ? (
+                        <CancelShiftButton shiftId={shift.id} />
+                      ) : null}
+                    </>
+                  )
                 }
               />
             );
