@@ -62,6 +62,65 @@ body {
   font-weight: var(--w-regular);
 }
 
+/* Public marketing-page motion. Dashboard routes never receive this wrapper. */
+.public-motion-root .public-motion-reveal {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+  transition:
+    opacity 720ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.public-motion-root .public-motion-reveal.public-motion-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  will-change: auto;
+}
+
+.public-motion-root .public-motion-hero {
+  transition-duration: 820ms;
+}
+
+.public-motion-root .public-motion-hero-item {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition:
+    opacity 680ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 680ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(100ms + var(--public-motion-order, 0) * 65ms);
+}
+
+.public-motion-root .public-motion-hero.public-motion-visible .public-motion-hero-item {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.public-motion-root .public-motion-hero img {
+  translate: 0 var(--public-parallax-y, 0);
+}
+
+@media (max-width: 767px) {
+  .public-motion-root .public-motion-reveal {
+    transform: translate3d(0, 18px, 0);
+  }
+
+  .public-motion-root .public-motion-hero img {
+    translate: 0 calc(var(--public-parallax-y, 0) * 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-motion-root .public-motion-reveal,
+  .public-motion-root .public-motion-hero-item,
+  .public-motion-root .public-motion-hero img {
+    opacity: 1;
+    transform: none;
+    translate: none;
+    transition: none;
+  }
+}
+
 /* =========================
    GLOBAL TYPOGRAPHY
 

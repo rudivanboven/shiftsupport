@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
+import PublicPageMotion from "@/components/motion/PublicPageMotion";
 import "./globals.css";
 
 /* Headings + UI text — Montserrat (variable font).
@@ -14,6 +15,11 @@ export const metadata: Metadata = {
   title: "ShiftSupport | Short-shift staffing for local retailers",
   description:
     "ShiftSupport helps local retailers handle busy moments with trained workers for short retail shifts.",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -21,7 +27,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={montserrat.variable}>
-      <body>{children}</body>
+      <body><PublicPageMotion>{children}</PublicPageMotion></body>
     </html>
   );
 }

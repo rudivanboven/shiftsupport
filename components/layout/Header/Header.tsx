@@ -26,7 +26,7 @@ export default function Header() {
 
   return (
     <>
-      <header className={styles.header}>
+      <header className={styles.header} id="top">
         <div className={`container ${styles.inner}`}>
           <a
             href="/"

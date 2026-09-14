@@ -169,10 +169,6 @@ export default async function HiresPage({
   ];
 
   const totalPaidCents = paidPayments.reduce((sum, payment) => sum + payment.amount_cents, 0);
-  const workerGrossCents = paidPayments.reduce(
-    (sum, payment) => sum + (payment.worker_gross_cents ?? 0),
-    0,
-  );
   const error = applicationError ?? shiftError;
 
   return (
@@ -194,10 +190,9 @@ export default async function HiresPage({
       <Panel title="Payment summary" description="Verified paid shift records for this store only.">
         <dl className={styles.paymentSummary}>
           <div><dt>Total paid</dt><dd>{formatMoney(totalPaidCents / 100)}</dd></div>
-          <div><dt>Worker gross represented</dt><dd>{formatMoney(workerGrossCents / 100)}</dd></div>
           <div><dt>Number of paid shifts</dt><dd>{paidPayments.length}</dd></div>
         </dl>
-        <p className={styles.accountingNote}>For payment history only. No worker payouts are created from this page.</p>
+        <p className={styles.accountingNote}>For payment history only.</p>
       </Panel>
 
       <div className={styles.tabs}><Tabs items={tabs} active={filter} label="Filter hiring history" /></div>

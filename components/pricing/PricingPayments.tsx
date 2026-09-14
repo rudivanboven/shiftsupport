@@ -388,17 +388,6 @@ export default function PricingPayments({
                     strong
                   />
                 </div>
-
-                <div className={styles.splitGrid}>
-                  <article className={styles.splitCard}>
-                    <span>Worker gross</span>
-                    <small>
-                      {EXAMPLE_HOURS} × {formatMoney(WORKER_HOURLY_RATE)}
-                    </small>
-                    <strong>{formatMoney(example.workerGross)}</strong>
-                    <p>The worker&apos;s gross hourly amount for the completed shift.</p>
-                  </article>
-                </div>
               </div>
             </Panel>
 
@@ -428,18 +417,29 @@ export default function PricingPayments({
                   <dt>Shift duration</dt>
                   <dd>{EXAMPLE_HOURS} hours</dd>
                 </div>
-                <div>
-                  <dt>Retailer rate</dt>
-                  <dd>{formatMoney(RETAILER_HOURLY_RATE)}/hour</dd>
-                </div>
-                <div className={styles.receiptTotal}>
-                  <dt>Total retailer amount</dt>
-                  <dd>{formatMoney(example.retailerTotal)}</dd>
-                </div>
-                <div>
-                  <dt>Worker gross</dt>
-                  <dd>{formatMoney(example.workerGross)}</dd>
-                </div>
+                {isWorker ? (
+                  <>
+                    <div>
+                      <dt>Worker gross rate</dt>
+                      <dd>{formatMoney(WORKER_HOURLY_RATE)}/hour</dd>
+                    </div>
+                    <div className={styles.receiptTotal}>
+                      <dt>Worker gross</dt>
+                      <dd>{formatMoney(example.workerGross)}</dd>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <dt>Retailer rate</dt>
+                      <dd>{formatMoney(RETAILER_HOURLY_RATE)}/hour</dd>
+                    </div>
+                    <div className={styles.receiptTotal}>
+                      <dt>Total retailer amount</dt>
+                      <dd>{formatMoney(example.retailerTotal)}</dd>
+                    </div>
+                  </>
+                )}
               </dl>
               <p className={styles.receiptNote}>
                 Illustrative example based on a {EXAMPLE_HOURS}-hour shift — not a real
@@ -449,9 +449,9 @@ export default function PricingPayments({
 
             <div className={styles.summaryCopy}>
               <p>
-                A completed shift can provide a clear summary of the shift and the payment
-                information that goes with it: how long the shift ran, the rate it was
-                priced at, the total retailer amount and the worker gross amount.
+                {isWorker
+                  ? "A completed shift records how long the shift ran, your gross rate and your gross earnings."
+                  : "A completed shift records how long the shift ran, your retailer rate and the total amount paid."}
               </p>
               <ul className={styles.summaryPoints}>
                 <li>

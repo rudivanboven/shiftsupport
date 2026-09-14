@@ -103,7 +103,7 @@ export default function Footer() {
           <span aria-hidden="true">|</span>
           <a href="tel:+918219743301">+91 8219 74 3301</a>
         </p>
-        <a className={styles.backToTop} href="#" aria-label="Back to top">
+        <a className={styles.backToTop} href="#top" aria-label="Back to top">
           <span>Back to top</span>
           <span className={styles.topIcon} aria-hidden="true">↑</span>
         </a>

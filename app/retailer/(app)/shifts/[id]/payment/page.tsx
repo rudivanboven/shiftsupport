@@ -211,14 +211,6 @@ export default async function ShiftPaymentPage({
                 </dd>
               </div>
               <div>
-                <dt>Worker gross</dt>
-                <dd>
-                  {paid
-                    ? money(payment?.worker_gross_cents) ?? formatMoney(expected.workerGross)
-                    : formatMoney(expected.workerGross)}
-                </dd>
-              </div>
-              <div>
                 <dt>Payment status</dt>
                 <dd>{statusBadge.label}</dd>
               </div>

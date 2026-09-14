@@ -142,7 +142,12 @@ export default function ContactPage() {
               </p>
             </div>
 
-            <form className={styles.formCard}>
+            <form
+              className={styles.formCard}
+              action="mailto:Shiftsupport@shiftsupport.net"
+              method="post"
+              encType="text/plain"
+            >
               <div className={styles.nameRow}>
                 <label>
                   First Name

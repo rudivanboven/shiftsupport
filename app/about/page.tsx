@@ -523,13 +523,13 @@ export default function AboutPage() {
               <div className={styles.ctaActions}>
                 <a
                   className={`headingFont ${styles.secondaryButton}`}
-                  href="#employer"
+                  href="/retailers"
                 >
                   For Retailers <span aria-hidden="true">→</span>
                 </a>
                 <a
                   className={`headingFont ${styles.primaryButton}`}
-                  href="#youth-workers"
+                  href="/workers"
                 >
                   For Workers <span aria-hidden="true">→</span>
                 </a>
