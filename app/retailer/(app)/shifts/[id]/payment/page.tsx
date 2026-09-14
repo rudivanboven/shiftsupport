@@ -219,15 +219,6 @@ export default async function ShiftPaymentPage({
                 </dd>
               </div>
               <div>
-                <dt>ShiftSupport platform portion</dt>
-                <dd>
-                  {paid
-                    ? money(payment?.platform_portion_cents) ??
-                      formatMoney(expected.platformPortion)
-                    : formatMoney(expected.platformPortion)}
-                </dd>
-              </div>
-              <div>
                 <dt>Payment status</dt>
                 <dd>{statusBadge.label}</dd>
               </div>
@@ -253,14 +244,11 @@ export default async function ShiftPaymentPage({
               ) : null}
             </dl>
 
-            <p className={styles.receiptNote}>
-              The ShiftSupport platform portion supports applicable employment-related
-              administration, insurance, compliance, payroll-related operations and
-              platform services.
-              {paid
-                ? ""
-                : " Amounts shown here are what this shift will cost — nothing has been charged yet."}
-            </p>
+            {!paid ? (
+              <p className={styles.receiptNote}>
+                Amounts shown here are what this shift will cost — nothing has been charged yet.
+              </p>
+            ) : null}
           </div>
         </Panel>
       </div>

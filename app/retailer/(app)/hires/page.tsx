@@ -173,10 +173,6 @@ export default async function HiresPage({
     (sum, payment) => sum + (payment.worker_gross_cents ?? 0),
     0,
   );
-  const platformCents = paidPayments.reduce(
-    (sum, payment) => sum + (payment.platform_portion_cents ?? 0),
-    0,
-  );
   const error = applicationError ?? shiftError;
 
   return (
@@ -192,14 +188,13 @@ export default async function HiresPage({
         <StatCard label="Not Selected" value={declined.length} hint="Applications declined" icon={<IconUsers />} tone="peach" />
         <StatCard label="Completed Hires" value={completed.length} hint="Confirmed completed shifts" icon={<IconCheck />} tone="lime" />
         <StatCard label="Paid Shifts" value={paidPayments.length} hint="Verified payment records" icon={<IconCalendar />} />
-        <StatCard label="Total Shift Spend" value={formatMoney(totalPaidCents / 100)} hint="Paid to ShiftSupport" icon={<IconCash />} />
+        <StatCard label="Total Shift Spend" value={formatMoney(totalPaidCents / 100)} hint="Across paid shifts" icon={<IconCash />} />
       </StatGrid>
 
       <Panel title="Payment summary" description="Verified paid shift records for this store only.">
         <dl className={styles.paymentSummary}>
-          <div><dt>Total paid to ShiftSupport</dt><dd>{formatMoney(totalPaidCents / 100)}</dd></div>
+          <div><dt>Total paid</dt><dd>{formatMoney(totalPaidCents / 100)}</dd></div>
           <div><dt>Worker gross represented</dt><dd>{formatMoney(workerGrossCents / 100)}</dd></div>
-          <div><dt>ShiftSupport platform portion</dt><dd>{formatMoney(platformCents / 100)}</dd></div>
           <div><dt>Number of paid shifts</dt><dd>{paidPayments.length}</dd></div>
         </dl>
         <p className={styles.accountingNote}>For payment history only. No worker payouts are created from this page.</p>

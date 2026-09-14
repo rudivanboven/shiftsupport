@@ -15,7 +15,6 @@ import {
 import { formatDate, formatMoney } from "@/lib/format";
 import {
   MEMBERSHIP_MONTHS,
-  PLATFORM_HOURLY_PORTION,
   RETAILER_HOURLY_RATE,
   WORKER_ANNUAL_MEMBERSHIP,
   WORKER_HOURLY_RATE,
@@ -24,11 +23,11 @@ import {
 import styles from "./PricingPayments.module.css";
 
 /**
- * The one place a signed-in user can read the whole fee and payment picture.
+ * The signed-in pricing and payment overview for workers and retailers.
  *
  * Every amount on this page comes from `lib/pricing` — the same module the
  * post-shift form and the server action price a real shift with — so the
- * explanation here can never drift away from what is actually charged.
+ * explanation here can never drift away from what is actually charged or earned.
  *
  * Public marketing pages deliberately carry none of these numbers; this
  * component is only ever rendered behind `requireWorker` / `requireRetailer`.
@@ -53,7 +52,7 @@ const RETAILER_FLOW = [
   ["Complete checkout", "Payment is completed before the shift is published."],
   ["Shift published", "Eligible local workers can see and apply for the shift."],
   ["Hire and complete", "Pick your worker, and the shift is confirmed once it is worked."],
-  ["Shift record", "The completed shift keeps a full summary of the amounts involved."],
+  ["Shift record", "The completed shift keeps a summary of the shift and payment."],
 ] as const;
 
 function FlowSteps({ steps }: { steps: readonly (readonly [string, string])[] }) {
@@ -138,10 +137,6 @@ function BreakdownRow({
     </div>
   );
 }
-
-/** The platform portion is described as what it supports — never as a tax. */
-const PLATFORM_PORTION_COPY =
-  "The ShiftSupport platform portion supports applicable employment-related administration, insurance, compliance, payroll-related operations and platform services.";
 
 /** The membership panel: what Stripe says, and what to do about it. */
 function MembershipPanel({
@@ -273,7 +268,7 @@ export default function PricingPayments({
         description={
           isWorker
             ? "Everything a ShiftSupport worker pays for, and everything a completed shift pays out. These details are only shown to signed-in members."
-            : "What a ShiftSupport shift costs, how that cost is calculated, and where it goes. These details are only shown to signed-in retailers."
+            : "What a ShiftSupport shift costs and how that cost is calculated. These details are only shown to signed-in retailers."
         }
       />
 
@@ -403,14 +398,6 @@ export default function PricingPayments({
                     <strong>{formatMoney(example.workerGross)}</strong>
                     <p>The worker&apos;s gross hourly amount for the completed shift.</p>
                   </article>
-                  <article className={styles.splitCard}>
-                    <span>ShiftSupport platform portion</span>
-                    <small>
-                      {EXAMPLE_HOURS} × {formatMoney(PLATFORM_HOURLY_PORTION)}
-                    </small>
-                    <strong>{formatMoney(example.platformPortion)}</strong>
-                    <p>{PLATFORM_PORTION_COPY}</p>
-                  </article>
                 </div>
               </div>
             </Panel>
@@ -453,10 +440,6 @@ export default function PricingPayments({
                   <dt>Worker gross</dt>
                   <dd>{formatMoney(example.workerGross)}</dd>
                 </div>
-                <div>
-                  <dt>ShiftSupport platform portion</dt>
-                  <dd>{formatMoney(example.platformPortion)}</dd>
-                </div>
               </dl>
               <p className={styles.receiptNote}>
                 Illustrative example based on a {EXAMPLE_HOURS}-hour shift — not a real
@@ -468,10 +451,8 @@ export default function PricingPayments({
               <p>
                 A completed shift can provide a clear summary of the shift and the payment
                 information that goes with it: how long the shift ran, the rate it was
-                priced at, the total retailer amount, the worker gross amount and the
-                ShiftSupport platform portion.
+                priced at, the total retailer amount and the worker gross amount.
               </p>
-              <p>{PLATFORM_PORTION_COPY}</p>
               <ul className={styles.summaryPoints}>
                 <li>
                   <IconCalendar width={15} height={15} />
