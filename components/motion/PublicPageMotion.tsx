@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import FloatingQrCard from "@/components/layout/FloatingQrCard/FloatingQrCard";
 
 const PUBLIC_ROUTES = new Set([
   "/",
@@ -86,6 +87,7 @@ export default function PublicPageMotion({ children }: { children: ReactNode }) 
   return (
     <div className="public-motion-root" ref={rootRef} key={pathname}>
       {children}
+      <FloatingQrCard />
     </div>
   );
 }
