@@ -8,6 +8,14 @@
   .contactSection { padding-top: 16px; }
 }
 
+@media (max-width: 767px) {
+  .heroVisual { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .heroVisual .decorCircle { display: none; }
+  .primaryImage, .secondaryImage { position: static; inset: auto; width: 100%; height: auto; border: 0; border-radius: 22px; object-fit: contain; }
+  .secondaryImage { height: auto; object-fit: contain; }
+  .heroVisual .floatingLabel { position: static; inset: auto; grid-column: 1 / -1; max-width: 100%; animation: none; justify-self: start; white-space: normal; }
+}
+
 .hero {
   position: relative;
   padding: 34px 0 78px;

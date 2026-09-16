@@ -71,6 +71,34 @@
   .heroCircle, .decorLines { display: none; }
   .imageCircle { width: 120px; height: 120px; right: -20px; }
 }
+
+/* Keep these final in the cascade; the compact layout above must not re-crop photos. */
+@media (max-width: 767px) {
+  .heroVisual { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .heroMainImage, .heroSmallImage { position: static; inset: auto; width: 100%; height: auto; border: 0; object-fit: contain; }
+  .heroSmallImage { height: 100%; object-fit: cover; }
+  .heroVisual .floatingLabel { position: static; inset: auto; grid-column: 1 / -1; max-width: 100%; justify-self: start; white-space: normal; }
+  .introImageWrap, .communityVisual { min-height: 0; display: grid; gap: 12px; }
+  .introImageWrap>img, .communityVisual>img { width: 100%; height: auto; margin: 0; object-fit: contain; border-radius: 22px; }
+  .introLabel, .communityLabel { position: static; inset: auto; max-width: 100%; justify-self: start; white-space: normal; }
+  .stepImage { display: grid; gap: 10px; }
+  .stepImage>img { height: auto; object-fit: contain; }
+  .stepImage .floatingLabel { position: static; inset: auto; justify-self: start; }
+}
+
+/* Mobile image QA: natural ratios and face-safe, non-overlay labels. */
+@media (max-width: 767px) {
+  .heroVisual { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .heroMainImage, .heroSmallImage { position: static; inset: auto; width: 100%; height: auto; border: 0; border-radius: 22px; object-fit: contain; }
+  .heroSmallImage { height: 100%; object-fit: cover; }
+  .heroVisual .floatingLabel { position: static; inset: auto; justify-self: start; }
+  .introImageWrap, .communityVisual { min-height: 0; display: grid; gap: 12px; }
+  .introImageWrap>img, .communityVisual>img { width: 100%; height: auto; margin: 0; object-fit: contain; border-radius: 22px; }
+  .introLabel, .communityLabel { position: static; inset: auto; justify-self: start; }
+  .stepImage { display: grid; gap: 10px; }
+  .stepImage>img { height: auto; object-fit: contain; }
+  .stepImage .floatingLabel { position: static; inset: auto; justify-self: start; }
+}
 @media (max-width: 767px) {
   .hero { padding:24px 0 50px; }.breadcrumb { margin-bottom:38px; }.heroCopy h1 { font-size:clamp(34px,10vw,44px); }.heroCopy>p { font-size:16px; }.heroVisual { min-height:390px; }.heroMainImage { left:28px; width:calc(100% - 28px); height:310px; border-radius:22px; }.heroSmallImage { width:42%; height:155px; border-width:5px; border-radius:18px; }.labelTop { right:8px; }.labelBottom { right:3%; bottom:16px; }.heroCircle,.decorLines { display:none; }.imageCircle { width:150px; height:150px; }
   .introSection,.experiencesSection,.processSection,.communitySection,.finalCta { padding:48px 0; }.introGrid { gap:38px; }.introImageWrap { min-height:360px; }.introImageWrap>img { height:360px; border-radius:22px; }.introLabel { right:10px; bottom:20px; }.sectionCopy h2,.communityCopy h2,.sectionHeading h2,.processHeading h2,.ctaInner h2 { font-size:clamp(29px,8vw,36px); }.sectionCopy>p,.communityCopy>p { font-size:15px; }.experienceGrid { grid-template-columns:1fr; }.experiencePanel { min-height:0; padding:30px 24px; border-radius:22px; }.experiencePanel h3 { font-size:28px; }.experiencePanel .outlineButton,.experiencePanel .solidButton { margin-top:4px; }.sectionHeading { margin-bottom:34px; }.processHeading { margin-bottom:44px; }

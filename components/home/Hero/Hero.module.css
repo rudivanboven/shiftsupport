@@ -56,6 +56,7 @@
   .title { font-size: clamp(50px, 8vw, 68px); }
 }
 @media (max-width: 767px) {
+  .contentWrap { min-width: 0; }
   .heroInner { gap: 46px; padding-top: 46px; padding-bottom: 60px; }
   .eyebrow { margin-bottom: 17px; font-size: 11px; letter-spacing: .16em; }
   .title { font-size: clamp(39px, 11.5vw, 54px); }
@@ -66,6 +67,10 @@
   .infoCard { min-width: 210px; padding: 12px 14px; border-radius: 18px; }
   .topCard { top: 5%; right: -6%; }
   .bottomCard { left: -6%; bottom: 7%; }
+}
+
+@media (max-width: 480px) {
+  .title { font-size: clamp(34px, 10.5vw, 41px); }
 }
 @media (max-width: 480px) {
   .heroInner { gap: 38px; padding-top: 40px; padding-bottom: 52px; }
@@ -89,4 +94,15 @@
   .infoCard { max-width: 188px; }
   .topCard { right: 1%; }
   .bottomCard { left: 1%; }
+}
+
+/* Mobile sequence: actions (in the preceding content), cards, then unobscured image. */
+@media (max-width: 767px) {
+  .visualWrap { width: min(100%, 480px); max-width: none; aspect-ratio: auto; display: grid; gap: 12px; }
+  .backCard, .imageShade { display: none; }
+  .imageCard { position: relative; inset: auto; order: 3; width: 100%; aspect-ratio: 1 / 1; border-radius: 24px; }
+  .heroImage { object-position: center 28%; }
+  .infoCard { position: relative; inset: auto; width: 100%; max-width: none; min-width: 0; padding: 13px 15px; border-radius: 18px; animation: none; }
+  .topCard { order: 1; }
+  .bottomCard { order: 2; }
 }

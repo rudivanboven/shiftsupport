@@ -826,13 +826,10 @@
     font-size: 15px;
   }
 
-  .side {
-    height: 260px;
-  }
-
-  .centre {
-    height: 300px;
-  }
+  .side { height: auto; aspect-ratio: 2 / 3; }
+  .centre { height: auto; aspect-ratio: 3 / 2; }
+  .img { object-fit: contain; }
+  .pill { position: static; width: fit-content; max-width: 100%; margin-top: 10px; animation: none; }
 
   .features {
     grid-template-columns: 1fr;
@@ -866,10 +863,8 @@
     font-size: 29px;
   }
 
-  .side,
-  .centre {
-    height: 230px;
-  }
+  .side { height: auto; aspect-ratio: 2 / 3; }
+  .centre { height: auto; aspect-ratio: 3 / 2; }
 
   .pill {
     font-size: 9px;

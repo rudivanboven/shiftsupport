@@ -50,3 +50,16 @@
 
 @media(max-width:900px){.valueGrid{grid-template-columns:1fr 1fr}.valueSection{padding:70px 0}}
 @media(max-width:767px){.valueGrid{grid-template-columns:1fr}.valueSection{padding:48px 0}.valueCard{padding:24px 22px}}
+
+/* Mobile photography: labels follow images and each source keeps a safe crop. */
+@media(max-width:767px){
+  .heroVisual{min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .heroMainImage,.heroSmallImage{position:static;inset:auto;width:100%;height:auto;border:0;border-radius:22px;object-fit:contain}
+  .heroSmallImage{height:auto;object-fit:contain}
+  .heroVisual .floatingLabel{position:static;inset:auto;grid-column:1/-1;max-width:100%;justify-self:start;white-space:normal}
+  .panelImage{height:auto;display:grid;gap:10px}
+  .panelImage img,.simpleVisual>img{width:100%;height:auto;object-fit:contain}
+  .panelImage .floatingLabel,.simpleVisual .floatingLabel{position:static;inset:auto;justify-self:start}
+  .accountBanner>img{object-position:center 18%}
+}
+@media(max-width:480px){.hero h1{font-size:32px}.heroCopy{min-width:0}}

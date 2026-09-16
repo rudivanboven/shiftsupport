@@ -1265,3 +1265,20 @@
     transform: translateY(320%);
   }
 }
+
+/* Mobile photography: preserve faces and keep labels/cards out of portraits. */
+@media (max-width: 767px) {
+  .heroVisual { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .heroVisual .shape { display: none; }
+  .primaryImage, .overlapImage { position: static; inset: auto; width: 100%; height: auto; object-fit: contain; border: 0; border-radius: 22px; }
+  .overlapImage { align-self: start; height: auto; object-fit: contain; }
+  .heroVisual .floatingBadge { position: static; animation: none; justify-self: start; }
+  .heroVisual .floatingBadge { grid-column: 1 / -1; max-width: 100%; white-space: normal; }
+  .badgeLocal, .badgeFlexible, .badgeReliable { inset: auto; }
+  .storyVisual, .missionVisual { min-height: 0; display: grid; gap: 12px; }
+  .storyVisual img, .missionVisual img { width: 100%; height: auto; object-fit: contain; }
+  .storyBadge, .missionVisual .floatingBadge { position: static; inset: auto; animation: none; justify-self: start; }
+  .storyBadge, .missionVisual .floatingBadge { max-width: 100%; white-space: normal; }
+  .miniGraphic { position: static; width: 100%; }
+  .quotePanel img { height: auto; object-fit: contain; }
+}

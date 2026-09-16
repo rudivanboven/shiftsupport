@@ -16,6 +16,20 @@
   .accountBanner>img{object-position:center 28%}
 }
 
+/* Mobile photography: preserve portrait heads and remove labels from faces. */
+@media(max-width:767px){
+  .heroVisual{min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mainImage,.smallImage{position:static;inset:auto;width:100%;height:auto;border:0;border-radius:22px;object-fit:contain}
+  .smallImage{height:auto;object-fit:contain}
+  .heroVisual .floatingLabel{position:static;inset:auto;display:inline-flex;grid-column:1/-1;max-width:100%;justify-self:start;white-space:normal}
+  .benefit img{height:auto;object-fit:contain}
+  .nearVisual{display:grid;gap:10px}
+  .nearVisual img{height:auto;object-fit:contain}
+  .nearVisual .floatingLabel{position:static;inset:auto;justify-self:start}
+  .accountBanner>img{object-position:center 18%}
+}
+@media(max-width:480px){.hero h1{font-size:32px}.heroCopy{min-width:0}}
+
 @media(max-width:767px){
   .hero{padding-bottom:16px}
   .benefitsSection{padding-top:18px}
