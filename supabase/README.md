@@ -10,7 +10,8 @@ column is removed, and re-running them is safe.
    project → **SQL Editor** → **New query**.
 2. Paste the whole of `migrations/0001_supabase_auth_architecture.sql`, run it.
 3. Paste the whole of `migrations/0002_hire_and_reject_rpc.sql`, run it.
-4. Then `0003`, `0004`, `0005`, `0006` and `0007` in order, the same way.
+4. Then `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009` and `0010` in
+   order, the same way.
 
 (Or, with the CLI linked to this project: `supabase db push`.)
 
@@ -126,3 +127,45 @@ Safe to re-run: the guards mean it can never re-activate a membership that has
 since lapsed or been cancelled. The file also carries a commented-out
 alternative that grants a grace period with a fixed end date instead of
 open-ended access.
+
+## What 0010 does
+
+The Operations Control Center (Super Admin). Additive and idempotent: it creates
+only new objects, and changes no existing table, column, policy, trigger or
+function. See [`../SUPER_ADMIN.md`](../SUPER_ADMIN.md) for the whole setup.
+
+| Area | Change |
+| --- | --- |
+| `super_admins` | New table: who may use `/super-admin`. Deliberately NOT a `profiles.role` value, so no signup path can produce it and the "can't edit my own role" rule is structural. RLS on, readable only by an active Super Admin, with no write policy. |
+| `admin_audit_log` | New table, append-only (a trigger refuses UPDATE/DELETE): admin user, action, target, timestamp, non-sensitive metadata. |
+| `admin_communications` | New table: one row per admin email attempt — recipient, subject, status, provider. Message bodies are not stored. |
+| `shift_time_entries` | New table: actual start/end, unpaid break, reported hours, approval state, approved hours, and payroll status per hired shift. Readable by Super Admins, the shift's store and the hired worker; written only through the functions below. |
+| `worker_payroll_identities` | New table: worker → payroll-provider employee id. No bank or tax data; ADP holds that. |
+| `is_super_admin()`, `is_primary_super_admin()` | The authorisation checks. `SECURITY DEFINER`, empty `search_path`, used by the new policies and by every write function. |
+| `grant_super_admin()`, `revoke_super_admin()` | Access management: primary-admin only, never self, primary and last-admin protected, worker/retailer accounts refused, audited in the same transaction. |
+| `submit_shift_hours()` | Records the hours actually worked (store or Super Admin). Always lands as `submitted`; re-recording resets any approval, and a store may not overwrite hours operations has already approved. Every recording is audited, whoever made it. Scheduled duration is never copied in as payroll time. |
+| `review_shift_hours()` | Super Admin approve/reject, optionally adjusting hours. Approval requires the store to have completed the shift and the hired worker to still match the recorded one, and is what makes a line payroll-ready. |
+| `set_payroll_status()` | Forward-only payroll steps (`ready` → `exported` → `submitted` → `processed`, plus `error` and retry), approved lines only, audited. |
+| `admin_log_action()`, `admin_record_communication()`, `set_worker_payroll_identity()` | The remaining audited admin writes. |
+| `operations_time_zone()`, `operations_now()` | The store-local clock that wall-clock shift times are compared against (`start_time::timestamptz` would read them as UTC and be hours out). Mirrors `OPERATIONS_TIME_ZONE` in `lib/admin/config.ts` — change both together. |
+| Column privileges | `shift_time_entries.worker_hourly_rate`, the notes and the payroll columns are not granted to `authenticated`; the store and worker see only the hours and whether they were approved. |
+| RLS | New policies on the new tables only. No existing policy is touched — `workers.phone/email` and `stores.contact_phone` are column-revoked from `authenticated` anyway, and migration 0009 drops any extra SELECT policy on `shifts`. Admin reads therefore happen server-side with the service role, after `is_super_admin()` has been re-checked for that request. |
+
+**The first Super Admin is not created by this migration.** Run migration 0011
+next, and use the commented-out bootstrap block in its §2 — not the one at the
+end of 0010, which is superseded (see below).
+
+## What 0011 does
+
+Fixes the separation check in `grant_super_admin()`. This database has a trigger
+on `auth.users` that creates a `profiles` row with role `worker` for every new
+auth user, so 0010's check against `profiles.role` refused every dedicated
+operations login, and its bootstrap SELECT matched zero rows while the SQL
+editor still said "Success".
+
+0011 replaces that one function (created by 0010, nothing older) so the check
+tests the record signup provisions instead — a `workers` row for a worker, a
+`store_users` row for a retailer. In practice that is stricter: a real worker or
+retailer always has one, and a fresh operations login never does. The trigger,
+worker/retailer signup, login and both dashboards are untouched. It also carries
+the corrected bootstrap block for the primary Super Admin.
