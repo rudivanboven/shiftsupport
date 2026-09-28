@@ -6,13 +6,6 @@ const Arrow = () => (
   </svg>
 );
 
-const Pin = () => (
-  <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-    <path d="M10 18s5-4.6 5-10a5 5 0 1 0-10 0c0 5.4 5 10 5 10Z" stroke="currentColor" strokeWidth="1.5" />
-    <circle cx="10" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.5" />
-  </svg>
-);
-
 const Mail = () => (
   <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
     <rect x="2.5" y="4" width="15" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
@@ -80,14 +73,6 @@ export default function Footer() {
         <div className={`${styles.column} ${styles.contactColumn}`}>
           <h2>Get in touch</h2>
           <div className={styles.contactList}>
-            <div className={styles.contactRow}>
-              <span className={styles.icon}><Pin /></span>
-              <span>
-                1020 Palos Verdes Boulevard
-                <br />
-                Redondo Beach, CA 90277, US
-              </span>
-            </div>
             <a className={`${styles.contactRow} ${styles.emailRow}`} href="mailto:Shiftsupport@shiftsupport.net">
               <span className={styles.icon}><Mail /></span>
               <span>Shiftsupport@shiftsupport.net</span>
