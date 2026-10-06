@@ -85,8 +85,6 @@ export default function Footer() {
         <p>© 2026 ShiftSupport. All rights reserved.</p>
         <p className={styles.credit}>
           Website is designed and developed by <strong>Ayush Thakur</strong>
-          <span aria-hidden="true">|</span>
-          <a href="tel:+918219743301">+91 8219 74 3301</a>
         </p>
         <a className={styles.backToTop} href="#top" aria-label="Back to top">
           <span>Back to top</span>
