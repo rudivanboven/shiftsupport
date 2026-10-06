@@ -139,7 +139,7 @@
 .heading {
   margin: 26px 0 0;
   color: #ffffff;
-  font-size: clamp(64px, 6vw, 96px);
+  font-size: clamp(58px, 5.5vw, 88px);
   font-weight: var(--w-semibold);
   line-height: 0.95;
   letter-spacing: -0.045em;
@@ -149,7 +149,7 @@
   max-width: 430px;
   margin: 24px 0 0;
   color: rgba(255, 255, 255, 0.95);
-  font-size: clamp(28px, 2.4vw, 36px);
+  font-size: clamp(25px, 2.15vw, 32px);
   font-weight: var(--w-regular);
   line-height: 1.25;
 }
@@ -351,7 +351,11 @@
   }
 
   .heading {
-    font-size: clamp(64px, 9vw, 72px);
+    font-size: clamp(56px, 8vw, 68px);
+  }
+
+  .lede {
+    font-size: clamp(24px, 3.4vw, 29px);
   }
 
   .step {
@@ -370,11 +374,11 @@
   }
 
   .heading {
-    font-size: clamp(47px, 12vw, 53px);
+    font-size: clamp(43px, 11vw, 49px);
   }
 
   .lede {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .timeline {
@@ -413,7 +417,7 @@
 
 @media (max-width: 480px) {
   .heading {
-    font-size: clamp(41px, 13vw, 45px);
+    font-size: clamp(38px, 12vw, 42px);
   }
 
   .timeline {

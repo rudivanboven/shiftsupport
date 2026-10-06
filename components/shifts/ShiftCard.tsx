@@ -20,7 +20,8 @@ import {
   totalPay,
 } from "@/lib/format";
 import { WORKER_HOURLY_RATE } from "@/lib/pricing";
-import type { Shift, StoreContact } from "@/lib/supabase/types";
+import { clockTime, describeDays } from "@/lib/recurrence";
+import type { SeriesInfo, Shift, StoreContact } from "@/lib/supabase/types";
 import styles from "./ShiftCard.module.css";
 
 export const ShiftGrid = ({ children }: { children: ReactNode }) => (
@@ -80,6 +81,12 @@ interface ShiftCardProps {
   /** Rendered as the last block in the card — used for the review state. */
   footer?: ReactNode;
   accent?: "green" | "muted" | "peach";
+  /**
+   * The recurring series this date belongs to (migration 0012). Omitted:
+   * nothing is shown, as before. `null`: a one-time shift — labelled as such
+   * on worker cards so the two are easy to tell apart.
+   */
+  series?: SeriesInfo | null;
 }
 
 export default function ShiftCard({
@@ -94,6 +101,7 @@ export default function ShiftCard({
   actions,
   footer,
   accent = "green",
+  series,
 }: ShiftCardProps) {
   const status = shift.status ?? "open";
   const resolvedBadge = badge ?? {
@@ -128,6 +136,20 @@ export default function ShiftCard({
         </div>
         <Badge tone={resolvedBadge.tone}>{resolvedBadge.label}</Badge>
       </div>
+
+      {series ? (
+        <p className={styles.recurrence}>
+          <span className={styles.recurrenceTag}>Recurring shift</span>
+          <span className={styles.recurrenceText}>
+            {describeDays(series.days_of_week)} · {clockTime(series.start_time)} –{" "}
+            {clockTime(series.end_time)}
+          </span>
+        </p>
+      ) : series === null && workerView ? (
+        <p className={styles.recurrence}>
+          <span className={`${styles.recurrenceTag} ${styles.oneTimeTag}`}>One-time shift</span>
+        </p>
+      ) : null}
 
       {shift.description ? (
         <p className={styles.description}>{shift.description}</p>

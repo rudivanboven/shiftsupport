@@ -6,6 +6,8 @@ import {
   type ApplicationWithContext,
 } from "@/lib/data/retailer";
 import { getWorkerRating } from "@/lib/data/reviews";
+import { getSeriesForShifts } from "@/lib/data/series";
+import { clockTime, describeDays } from "@/lib/recurrence";
 import { Badge, EmptyState, ErrorState, PageHeader, Panel } from "@/components/ui/Kit";
 import Tabs, { type TabItem } from "@/components/dashboard/Tabs";
 import { buttonClass } from "@/components/ui/buttonClass";
@@ -64,6 +66,8 @@ export default async function ApplicantsPage({
       workerIds.map(async (id) => [id, await getWorkerRating(id)] as const),
     ),
   );
+
+  const seriesByShift = await getSeriesForShifts(applications.map((a) => a.shift_id));
 
   const scoped = params.shift
     ? applications.filter((a) => a.shift_id === params.shift)
@@ -161,6 +165,7 @@ export default async function ApplicantsPage({
         ordered.map(([shiftId, list]) => {
           const shift = list[0].shifts;
           const filled = Boolean(shift?.accepted_by);
+          const series = seriesByShift.get(shiftId);
 
           return (
             <div className={styles.shiftBlock} key={shiftId}>
@@ -173,6 +178,15 @@ export default async function ApplicantsPage({
                       {formatTime(shift?.end_time)} · {formatDuration(shift?.duration)} ·{" "}
                       {formatRate(shift?.hourly_rate ?? null)}
                     </p>
+                    {series ? (
+                      <p className={styles.shiftMeta}>
+                        <strong>Recurring shift</strong> · {describeDays(series.days_of_week)}{" "}
+                        {clockTime(series.start_time)} – {clockTime(series.end_time)}
+                        {series.assigned_worker_id
+                          ? " · your recurring worker is already kept for upcoming dates; hiring here covers this date only."
+                          : " · the worker you hire is kept on the upcoming dates of this series."}
+                      </p>
+                    ) : null}
                   </div>
                   <Badge tone={filled ? "filled" : "open"}>
                     {filled ? "Filled" : "Open"}

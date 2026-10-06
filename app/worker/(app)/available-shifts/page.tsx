@@ -3,11 +3,13 @@ import { requireWorker } from "@/lib/auth/session";
 import { getMembership } from "@/lib/membership";
 import MembershipLock from "@/components/worker/MembershipLock";
 import { getAvailableShifts, getWorkerApplications } from "@/lib/data/worker";
+import { collapseSeries, getSeriesForShifts } from "@/lib/data/series";
 import { EmptyState, ErrorState, PageHeader, Panel } from "@/components/ui/Kit";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
 import Tabs, { type TabItem } from "@/components/dashboard/Tabs";
 import { IconSearch } from "@/components/dashboard/Icons";
 import { buttonClass } from "@/components/ui/buttonClass";
+import { formatDate } from "@/lib/format";
 import ApplyButton from "./ApplyButton";
 import ShiftDetails from "./ShiftDetails";
 
@@ -50,7 +52,12 @@ export default async function AvailableShiftsPage({
 
   const appliedShiftIds = new Set(applications.map((a) => a.shift_id));
 
-  const sorted = [...shifts].sort((a, b) => {
+  // A recurring series is listed once, at its next open date: one application
+  // covers the series, so there is no point applying week by week.
+  const seriesByShift = await getSeriesForShifts(shifts.map((s) => s.id));
+  const { visible, openDates } = collapseSeries(shifts, seriesByShift);
+
+  const sorted = [...visible].sort((a, b) => {
     if (sort === "pay") return (b.hourly_rate ?? 0) - (a.hourly_rate ?? 0);
     if (sort === "newest") return (b.created_at ?? "").localeCompare(a.created_at ?? "");
     return a.start_time.localeCompare(b.start_time);
@@ -97,7 +104,10 @@ export default async function AvailableShiftsPage({
         </Panel>
       ) : (
         <ShiftGrid>
-          {sorted.map((shift) => (
+          {sorted.map((shift) => {
+            const series = seriesByShift.get(shift.id) ?? null;
+            const dates = openDates(shift.id);
+            return (
             <ShiftCard
               key={shift.id}
               shift={shift}
@@ -105,12 +115,23 @@ export default async function AvailableShiftsPage({
               storeName={shift.stores?.name ?? "A local store"}
               storeAddress={shift.stores?.address}
               badge={{ tone: "open", label: "Open" }}
+              series={series}
+              note={
+                series
+                  ? {
+                      text: `Starts ${formatDate(shift.start_time)}${
+                        dates > 1 ? `, with ${dates - 1} more date${dates === 2 ? "" : "s"} already scheduled` : ""
+                      }. Apply once — if you're hired, you're kept on the upcoming dates of this series.`,
+                    }
+                  : undefined
+              }
               actions={
                 <>
                   <ShiftDetails
                     shift={shift}
                     storeName={shift.stores?.name ?? "A local store"}
                     storeAddress={shift.stores?.address ?? null}
+                    series={series}
                   />
                   <ApplyButton
                     shiftId={shift.id}
@@ -119,7 +140,8 @@ export default async function AvailableShiftsPage({
                 </>
               }
             />
-          ))}
+            );
+          })}
         </ShiftGrid>
       )}
     </>

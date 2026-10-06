@@ -7,6 +7,7 @@ import {
   getStoreShifts,
 } from "@/lib/data/retailer";
 import { getShiftReviewStates } from "@/lib/data/reviews";
+import { getSeriesForShifts, getStoreSeries } from "@/lib/data/series";
 import { EmptyState, ErrorState, PageHeader, Panel } from "@/components/ui/Kit";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
 import Tabs, { type TabItem } from "@/components/dashboard/Tabs";
@@ -17,6 +18,7 @@ import type { Shift } from "@/lib/supabase/types";
 import ShiftReviewBlock from "@/components/reviews/ShiftReviewBlock";
 import CancelShiftButton from "./ShiftActions";
 import PayShiftButton from "./[id]/payment/PayShiftButton";
+import SeriesOverview from "./series/SeriesOverview";
 
 export const metadata: Metadata = { title: "My shifts | ShiftSupport" };
 
@@ -52,10 +54,12 @@ export default async function RetailerShiftsPage({
     ? (params.filter as Filter)
     : "all";
 
-  const [{ shifts, error }, { applications }] = await Promise.all([
+  const [{ shifts, error }, { applications }, storeSeries] = await Promise.all([
     getStoreShifts(store.id),
     getStoreApplications(store.id),
+    getStoreSeries(store.id),
   ]);
+  const seriesByShift = await getSeriesForShifts(shifts.map((s) => s.id));
 
   const counts = countApplicationsByShift(applications);
   const visible = shifts.filter((shift) => matches(shift, filter));
@@ -97,6 +101,8 @@ export default async function RetailerShiftsPage({
         }
       />
 
+      {storeSeries.length > 0 ? <SeriesOverview series={storeSeries} /> : null}
+
       <Tabs items={tabs} active={filter} label="Filter shifts" />
 
       {error ? (
@@ -134,6 +140,15 @@ export default async function RetailerShiftsPage({
             const hired = Boolean(shift.accepted_by);
             const workerName =
               workerContacts.get(shift.id)?.worker_name ?? "this worker";
+            const series = seriesByShift.get(shift.id);
+            const seriesLink = series ? (
+              <a
+                className={buttonClass("ghost", { small: true })}
+                href={`/retailer/shifts/series/${series.id}`}
+              >
+                View series
+              </a>
+            ) : null;
 
             return (
               <ShiftCard
@@ -141,6 +156,7 @@ export default async function RetailerShiftsPage({
                 shift={shift}
                 storeAddress={store.address}
                 applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
+                series={series}
                 accent={cancelled || past ? "muted" : shift.accepted_by ? "peach" : "green"}
                 badge={
                   shift.status === "draft"
@@ -180,7 +196,11 @@ export default async function RetailerShiftsPage({
                       >
                         Shift summary
                       </a>
-                      {!cancelled ? <CancelShiftButton shiftId={shift.id} /> : null}
+                      {seriesLink}
+                      {!cancelled ? <CancelShiftButton
+                          shiftId={shift.id}
+                          label={series ? "Cancel this date" : undefined}
+                        /> : null}
                     </>
                   ) : (
                     <>
@@ -196,8 +216,12 @@ export default async function RetailerShiftsPage({
                       >
                         {shift.payment_status === "paid" ? "Receipt" : "Shift summary"}
                       </a>
+                      {seriesLink}
                       {!cancelled && !past ? (
-                        <CancelShiftButton shiftId={shift.id} />
+                        <CancelShiftButton
+                          shiftId={shift.id}
+                          label={series ? "Cancel this date" : undefined}
+                        />
                       ) : null}
                     </>
                   )

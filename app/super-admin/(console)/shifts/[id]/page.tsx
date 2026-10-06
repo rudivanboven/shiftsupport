@@ -12,6 +12,8 @@ import { wallClockNow } from "@/lib/admin/dates";
 import { APPLICATION_STATUS, PAYMENT_STATUS, SHIFT_STATUS, STAGE_HELP, STAGE_LABELS, STAGE_TONES } from "@/lib/admin/labels";
 import { requireSuperAdmin } from "@/lib/admin/auth";
 import { loadSnapshot, payrollStage, workerContact } from "@/lib/admin/snapshot";
+import { loadSeriesIndex } from "@/lib/admin/series";
+import { clockTime, describeDays } from "@/lib/recurrence";
 import { formatDate, formatDateTime, formatTime } from "@/lib/format";
 import { PLATFORM_HOURLY_PORTION, RETAILER_HOURLY_RATE, WORKER_HOURLY_RATE } from "@/lib/pricing";
 import styles from "@/components/super-admin/Admin.module.css";
@@ -46,9 +48,10 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
   await requireSuperAdmin();
 
   const { id } = await params;
-  const snapshot = await loadSnapshot();
+  const [snapshot, seriesIndex] = await Promise.all([loadSnapshot(), loadSeriesIndex()]);
   const shift = snapshot.shiftById.get(id);
   if (!shift) notFound();
+  const series = seriesIndex.get(shift.id);
 
   const store = snapshot.storeById.get(shift.store_id);
   const payment = snapshot.paymentByShift.get(shift.id);
@@ -107,6 +110,16 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
           <DefinitionList
             items={[
               ["Task", shift.task_type],
+              [
+                "Shift type",
+                series
+                  ? `Recurring · ${describeDays(series.daysOfWeek)} ${clockTime(series.startTime)}–${clockTime(series.endTime)}${
+                      series.assignedWorkerId
+                        ? ` · kept worker ${snapshot.workerById.get(series.assignedWorkerId)?.full_name ?? "assigned"}`
+                        : ""
+                    }`
+                  : "One-time",
+              ],
               ["Description", shift.description ?? "—"],
               ["Location", shift.shift_location ?? store?.address ?? "—"],
               ["Scheduled start", formatDateTime(shift.start_time)],

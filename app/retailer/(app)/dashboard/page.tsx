@@ -7,6 +7,7 @@ import {
   summariseShifts,
 } from "@/lib/data/retailer";
 import { getShiftReviewStates, getStoreRating } from "@/lib/data/reviews";
+import { getSeriesForShifts } from "@/lib/data/series";
 import {
   Badge,
   Columns,
@@ -50,9 +51,10 @@ export default async function RetailerDashboardPage() {
 
   // Store rating, plus how many finished shifts still need the retailer.
   const finished = shifts.filter((s) => s.accepted_by && isPast(s.end_time));
-  const [rating, reviewStates] = await Promise.all([
+  const [rating, reviewStates, seriesByShift] = await Promise.all([
     getStoreRating(store.id),
     getShiftReviewStates(finished.map((s) => s.id)),
+    getSeriesForShifts(recentShifts.map((s) => s.id)),
   ]);
   const reviewsToLeave = [...reviewStates.values()].filter((s) => s.can_review).length;
   const awaitingCompletion = finished.filter((s) => s.status !== "completed").length;
@@ -167,6 +169,7 @@ export default async function RetailerDashboardPage() {
                         shift={shift}
                         storeAddress={store.address}
                         applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
+                        series={seriesByShift.get(shift.id)}
                         accent={shift.status === "open" ? "green" : "muted"}
                         badge={
                           shift.status === "draft"

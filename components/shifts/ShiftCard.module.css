@@ -402,3 +402,39 @@
     transition: none;
   }
 }
+
+/* recurring series — which kind of shift this is */
+
+.recurrence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 20px 0;
+}
+
+.recurrenceTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--brand-green);
+  font-family: var(--font-heading);
+  font-size: 11.5px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.oneTimeTag {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.recurrenceText {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: var(--w-semibold);
+  color: var(--ink);
+}

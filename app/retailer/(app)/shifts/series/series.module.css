@@ -1,0 +1,210 @@
+/* ---------- overview panel on My shifts ---------- */
+
+.overview {
+  margin-bottom: 18px;
+}
+
+.overviewList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overviewRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.overviewMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.overviewTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: var(--w-semibold);
+  color: var(--ink);
+}
+
+.overviewMeta {
+  margin: 2px 0 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---------- series detail page ---------- */
+
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.callout {
+  display: grid;
+  gap: 14px;
+}
+
+.calloutText {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.calloutActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pricing {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.pricing > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+
+.pricing dt {
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  font-weight: var(--w-medium);
+  color: var(--muted);
+}
+
+.pricing dd {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 13.5px;
+  font-weight: var(--w-semibold);
+  text-align: right;
+  color: var(--ink);
+}
+
+.pricing > .pricingTotal {
+  background: var(--brand-green-tint);
+}
+
+.pricingTotal dd {
+  color: var(--brand-green);
+}
+
+.pricingNote {
+  margin: 12px 0 0;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.dates {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dateRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.dateRow:first-child {
+  border-top: 0;
+}
+
+.dateRowMuted {
+  opacity: 0.62;
+}
+
+.dateMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.dateTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 14.5px;
+  font-weight: var(--w-semibold);
+  color: var(--ink);
+}
+
+.dateMeta,
+.dateWorker {
+  margin: 3px 0 0;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dateWorker {
+  color: var(--brand-green);
+  font-weight: var(--w-medium);
+}
+
+.dateSide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dateActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewRow,
+  .dateRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dateSide {
+    justify-content: flex-start;
+  }
+}

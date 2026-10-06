@@ -3,8 +3,10 @@ import { requireWorker } from "@/lib/auth/session";
 import {
   getContactsForShifts,
   getWorkerApplications,
+  withSeriesAssignments,
   type ApplicationWithShift,
 } from "@/lib/data/worker";
+import { getSeriesForShifts } from "@/lib/data/series";
 import { getShiftReviewStates } from "@/lib/data/reviews";
 import { EmptyState, ErrorState, PageHeader, Panel } from "@/components/ui/Kit";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
@@ -48,7 +50,10 @@ export default async function WorkerMyShiftsPage({
     ? (params.filter as Filter)
     : "all";
 
-  const { applications, error } = await getWorkerApplications(worker.id);
+  const { applications: applied, error } = await getWorkerApplications(worker.id);
+  // Plus the recurring dates they were kept on without a new application.
+  const applications = await withSeriesAssignments(applied, worker.id);
+  const seriesByShift = await getSeriesForShifts(applications.map((a) => a.shift_id));
 
   // Store contact details are only fetched — and only returned by the
   // database — for shifts this worker was actually hired for.
@@ -143,13 +148,24 @@ export default async function WorkerMyShiftsPage({
                 ? { tone: "rejected" as const, label: "Not selected" }
                 : { tone: "pending" as const, label: "Application pending" };
 
+            const series = seriesByShift.get(shift.id) ?? null;
+            const keptBySeries =
+              Boolean(series?.assigned_worker_id) && series?.assigned_worker_id === worker.id;
+
             const note = hired
               ? finished
                 ? {
                     text: "This shift is done. Thanks for covering it.",
                     hired: true,
                   }
-                : undefined
+                : keptBySeries
+                  ? {
+                      text: application.via_series
+                        ? "You're the recurring worker for this series, so this date was booked for you — no new application needed."
+                        : "You're the recurring worker for this series. Upcoming dates are booked for you as the store schedules them.",
+                      hired: true,
+                    }
+                  : undefined
               : declined
                 ? {
                     tone: "warning" as const,
@@ -172,6 +188,7 @@ export default async function WorkerMyShiftsPage({
                 note={note}
                 contact={hired ? (contacts.get(shift.id) ?? null) : null}
                 accent={hired ? "green" : declined || finished ? "muted" : "peach"}
+                series={series}
                 footer={
                   hired && finished ? (
                     <ShiftReviewBlock

@@ -97,7 +97,45 @@ export interface Shift {
   amount_paid_cents?: number | null;
   paid_at?: string | null;
   published_at?: string | null;
+  /* Recurring series (migration 0012). NULL / absent = a one-time shift.
+     Not selected by the original shift queries; read via lib/data/series. */
+  series_id?: string | null;
+  occurrence_date?: string | null;
 }
+
+export type ShiftSeriesStatus = "active" | "ended" | "cancelled";
+
+/**
+ * A recurring series (migration 0012). Its dates are ordinary `shifts` rows,
+ * each priced, paid for and published on its own; the series holds the
+ * schedule and the worker kept for it.
+ */
+export interface ShiftSeries {
+  id: string;
+  store_id: string;
+  task_type: string;
+  description: string | null;
+  shift_location: string | null;
+  /** ISO weekdays, 1 = Monday … 7 = Sunday. */
+  days_of_week: number[];
+  /** Postgres `time`, e.g. "17:00:00" — wall-clock at the store. */
+  start_time: string;
+  end_time: string;
+  starts_on: string;
+  ends_on: string | null;
+  status: ShiftSeriesStatus;
+  assigned_worker_id: string | null;
+  assigned_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** What a shift card needs to say about the series a date belongs to. */
+export type SeriesInfo = Pick<
+  ShiftSeries,
+  "id" | "days_of_week" | "start_time" | "end_time" | "status" | "assigned_worker_id"
+> & { occurrence_date: string | null };
 
 /** One Stripe Checkout payment for one shift. */
 export interface ShiftPayment {

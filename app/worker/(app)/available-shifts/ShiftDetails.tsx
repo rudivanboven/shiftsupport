@@ -11,17 +11,20 @@ import {
   formatTime,
 } from "@/lib/format";
 import { priceShift, WORKER_HOURLY_RATE } from "@/lib/pricing";
-import type { Shift } from "@/lib/supabase/types";
+import { clockTime, describeDays } from "@/lib/recurrence";
+import type { SeriesInfo, Shift } from "@/lib/supabase/types";
 import styles from "./details.module.css";
 
 export default function ShiftDetails({
   shift,
   storeName,
   storeAddress,
+  series,
 }: {
   shift: Shift;
   storeName: string;
   storeAddress: string | null;
+  series?: SeriesInfo | null;
 }) {
   const [open, setOpen] = useState(false);
   const hours = Number(shift.duration);
@@ -48,12 +51,21 @@ export default function ShiftDetails({
   const rows: [string, string][] = [
     ["Store", storeName],
     ["Task", shift.task_type],
-    ["Date", formatDate(shift.start_time)],
+    [
+      "Shift type",
+      series
+        ? `Recurring — ${describeDays(series.days_of_week)}, ${clockTime(series.start_time)} – ${clockTime(series.end_time)}`
+        : "One-time shift",
+    ],
+    [series ? "First date" : "Date", formatDate(shift.start_time)],
     ["Start", formatTime(shift.start_time)],
     ["End", formatTime(shift.end_time)],
     ["Duration", formatDuration(shift.duration)],
     ["Gross rate", formatRate(WORKER_HOURLY_RATE)],
-    ["Estimated gross", gross === null ? "To be confirmed" : formatMoney(gross)],
+    [
+      series ? "Estimated gross per date" : "Estimated gross",
+      gross === null ? "To be confirmed" : formatMoney(gross),
+    ],
   ];
 
   return (
@@ -113,6 +125,9 @@ export default function ShiftDetails({
             <p className={styles.dialogNote}>
               The store&apos;s phone number is shared with you as soon as you&apos;re
               hired for this shift.
+              {series
+                ? " This is a recurring shift: apply once, and if you're hired you're kept on its upcoming dates."
+                : null}
             </p>
           </div>
         </div>

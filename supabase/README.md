@@ -10,8 +10,8 @@ column is removed, and re-running them is safe.
    project → **SQL Editor** → **New query**.
 2. Paste the whole of `migrations/0001_supabase_auth_architecture.sql`, run it.
 3. Paste the whole of `migrations/0002_hire_and_reject_rpc.sql`, run it.
-4. Then `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009` and `0010` in
-   order, the same way.
+4. Then `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`,
+   `0011` and `0012` in order, the same way.
 
 (Or, with the CLI linked to this project: `supabase db push`.)
 
@@ -169,3 +169,19 @@ tests the record signup provisions instead — a `workers` row for a worker, a
 retailer always has one, and a fresh operations login never does. The trigger,
 worker/retailer signup, login and both dashboards are untouched. It also carries
 the corrected bootstrap block for the primary Super Admin.
+
+## What 0012 does
+
+Recurring shifts ("every Wednesday, 17:00–20:00"). Additive and idempotent.
+Existing shifts get `series_id = NULL` and stay one-time shifts.
+
+| Area | Change |
+| --- | --- |
+| `shift_series` | New table: the recurring "parent" — task, location, `days_of_week` (ISO 1=Mon … 7=Sun), start/end time, start/end date, `status`, and `assigned_worker_id` (the worker kept for the series). It holds no money. |
+| `shifts` | Adds nullable `series_id` and `occurrence_date`, with a unique index on `(series_id, occurrence_date)`. Each date in a series is an ordinary shift row with its own status, payment and hired worker, so one date can be cancelled or reopened without touching the rest. |
+| Payments | Unchanged. Each date is priced, paid for (one `shift_payments` row) and published through the existing per-shift Stripe Checkout. No subscription, no automatic charge. |
+| `hire_applicant()` | Replaced with an identical function plus one block that runs only for a series date: the hired worker becomes the series' kept worker and is put on every later date that is already live and unfilled — one application, not one per week. Pending applicants on those dates are declined and notified. The series row is locked before the shift row, so two hires on the same series cannot deadlock. |
+| `shifts_series_auto_assign` | Trigger: when a later date's payment publishes it (`draft` → `open`), it is booked straight onto the kept worker (`filled`) if their membership is active. The Stripe fulfillment code is unchanged. Only the publish transition is affected, so a date that is cancelled and reopened goes to the marketplace. |
+| `shifts_series_guard` | Trigger: a shift can only join a series of its own store. |
+| `shift_series_enforce_assignment` | Trigger: a browser session cannot set or change `assigned_worker_id` (or move a series to another store); only `hire_applicant` can. |
+| RLS | `shift_series`: store members read/insert/update their own; a worker reads a series only while they can see one of its dates (the same rule as `shifts_select`) or are its kept worker. No delete policy. No existing policy is touched. |

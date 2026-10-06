@@ -21,6 +21,13 @@ export interface ShiftWithStore extends Shift {
 
 export interface ApplicationWithShift extends ShiftApplication {
   shifts: ShiftWithStore | null;
+  /**
+   * True for a date the worker holds because they are a recurring series'
+   * kept worker (migration 0012). There is no application row behind it —
+   * one application covers the whole series — so `id` is synthetic and must
+   * not be passed to an application action.
+   */
+  via_series?: boolean;
 }
 
 /**
@@ -65,6 +72,45 @@ export async function getWorkerApplications(workerId: string) {
     applications: (data ?? []) as unknown as ApplicationWithShift[],
     error: error?.message ?? null,
   };
+}
+
+/**
+ * Adds the recurring-series dates this worker was booked onto without
+ * applying (migration 0012), shaped like approved applications so the pages
+ * that list hired shifts show them too. Dates they also applied for are not
+ * duplicated. Before the migration the query fails and nothing is added.
+ */
+export async function withSeriesAssignments(
+  applications: ApplicationWithShift[],
+  workerId: string,
+): Promise<ApplicationWithShift[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("shifts")
+    .select(`${SHIFT_COLUMNS},stores(${STORE_COLUMNS})`)
+    .eq("accepted_by", workerId)
+    .not("series_id", "is", null)
+    .order("start_time", { ascending: true });
+
+  if (error || !data?.length) return applications;
+
+  const covered = new Set(applications.map((a) => a.shift_id));
+  const kept = (data as unknown as ShiftWithStore[])
+    .filter((shift) => !covered.has(shift.id))
+    .map<ApplicationWithShift>((shift) => ({
+      id: `series:${shift.id}`,
+      shift_id: shift.id,
+      worker_id: workerId,
+      status: "approved",
+      applied_at: shift.created_at ?? shift.start_time,
+      reviewed_at: null,
+      rejection_reason: null,
+      shifts: shift,
+      via_series: true,
+    }));
+
+  return [...applications, ...kept];
 }
 
 /**

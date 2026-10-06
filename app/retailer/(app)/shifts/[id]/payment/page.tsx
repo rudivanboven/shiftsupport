@@ -14,6 +14,8 @@ import {
 } from "@/components/dashboard/Icons";
 import { requireRetailer } from "@/lib/auth/session";
 import { getShiftPayment } from "@/lib/data/retailer";
+import { getSeriesForShifts } from "@/lib/data/series";
+import { describeDays } from "@/lib/recurrence";
 import { formatDate, formatDuration, formatMoney, formatTime } from "@/lib/format";
 import { priceShift, RETAILER_HOURLY_RATE } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
@@ -62,7 +64,16 @@ export default async function ShiftPaymentPage({
   // RLS already limits this to the caller's own store; this is the second lock.
   if (!shift || shift.store_id !== store.id) notFound();
 
-  const { payment } = await getShiftPayment(shift.id);
+  const [{ payment }, seriesByShift] = await Promise.all([
+    getShiftPayment(shift.id),
+    getSeriesForShifts([shift.id]),
+  ]);
+  const series = seriesByShift.get(shift.id) ?? null;
+  // A recurring date published after the hire goes straight to the kept
+  // worker (migration 0012) instead of to the marketplace.
+  const bookedForSeries = Boolean(
+    series?.assigned_worker_id && shift.accepted_by === series.assigned_worker_id,
+  );
 
   const hours = Number(shift.duration) || 0;
   const expected = priceShift(hours);
@@ -89,15 +100,23 @@ export default async function ShiftPaymentPage({
         title={paid ? shift.task_type : "Your shift is ready for payment"}
         description={
           paid
-            ? "This shift has been paid for and is live for workers."
+            ? bookedForSeries
+              ? "This date has been paid for and is booked for your recurring worker."
+              : "This shift has been paid for and is live for workers."
             : legacy
               ? "This shift was posted before online payments were introduced."
               : "Your shift has been saved as a draft. Complete payment to publish it to eligible workers."
         }
         actions={
-          <a className={buttonClass("ghost")} href="/retailer/shifts">
-            Back to my shifts
-          </a>
+          series ? (
+            <a className={buttonClass("ghost")} href={`/retailer/shifts/series/${series.id}`}>
+              Back to recurring shift
+            </a>
+          ) : (
+            <a className={buttonClass("ghost")} href="/retailer/shifts">
+              Back to my shifts
+            </a>
+          )
         }
       />
 
@@ -109,7 +128,9 @@ export default async function ShiftPaymentPage({
             {paid ? (
               <p className={styles.statusText}>
                 Payment confirmed{payment?.paid_at ? ` on ${formatDate(payment.paid_at)}` : ""}.
-                Your shift is published and eligible workers can apply.
+                {bookedForSeries
+                  ? " This date is booked for your recurring worker."
+                  : " Your shift is published and eligible workers can apply."}
               </p>
             ) : legacy ? (
               <p className={styles.statusText}>
@@ -166,6 +187,13 @@ export default async function ShiftPaymentPage({
               label="Date"
               value={formatDate(shift.start_time)}
             />
+            {series ? (
+              <MetaRow
+                icon={<IconCalendar width={16} height={16} />}
+                label="Recurring shift"
+                value={`${describeDays(series.days_of_week)} — this date is paid for on its own`}
+              />
+            ) : null}
             <MetaRow
               icon={<IconClock width={16} height={16} />}
               label="Time"

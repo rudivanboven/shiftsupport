@@ -6,9 +6,11 @@ import {
   getAvailableShifts,
   getContactsForShifts,
   getWorkerApplications,
+  withSeriesAssignments,
   summariseWorker,
 } from "@/lib/data/worker";
 import { getShiftReviewStates, getWorkerRating } from "@/lib/data/reviews";
+import { collapseSeries, getSeriesForShifts } from "@/lib/data/series";
 import {
   Columns,
   EmptyState,
@@ -39,8 +41,17 @@ export default async function WorkerDashboardPage() {
   const { user, profile, worker } = await requireWorker();
   const membership = await getMembership(worker.id);
 
-  const [{ shifts, error: shiftsError }, { applications, error: appsError }] =
+  const [{ shifts: openShifts, error: shiftsError }, { applications: applied, error: appsError }] =
     await Promise.all([getAvailableShifts(), getWorkerApplications(worker.id)]);
+
+  // Recurring dates they were kept on count as hired shifts, and a series is
+  // suggested once rather than once per date.
+  const applications = await withSeriesAssignments(applied, worker.id);
+  const seriesByShift = await getSeriesForShifts([
+    ...openShifts.map((s) => s.id),
+    ...applications.map((a) => a.shift_id),
+  ]);
+  const shifts = collapseSeries(openShifts, seriesByShift).visible;
 
   const stats = summariseWorker(shifts, applications);
   const loadError = shiftsError ?? appsError;
@@ -170,6 +181,7 @@ export default async function WorkerDashboardPage() {
                       storeAddress={application.shifts?.stores?.address}
                       badge={{ tone: "approved", label: "You're hired" }}
                       contact={contacts.get(application.shift_id) ?? null}
+                      series={seriesByShift.get(application.shift_id) ?? null}
                     />
                   ))}
                 </ShiftGrid>
@@ -211,6 +223,7 @@ export default async function WorkerDashboardPage() {
                       storeName={shift.stores?.name ?? "A local store"}
                       storeAddress={shift.stores?.address}
                       badge={{ tone: "open", label: "Open" }}
+                      series={seriesByShift.get(shift.id) ?? null}
                       actions={
                         <a
                           className={buttonClass("primary", { small: true })}

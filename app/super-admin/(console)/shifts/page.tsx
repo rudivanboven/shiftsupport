@@ -23,6 +23,8 @@ import { parseRange, wallClockInRange } from "@/lib/admin/dates";
 import { PAYMENT_STATUS, SHIFT_STATUS, STAGE_LABELS, STAGE_TONES } from "@/lib/admin/labels";
 import { requireSuperAdmin } from "@/lib/admin/auth";
 import { isOpenShift, loadSnapshot, payrollStage, workerContact } from "@/lib/admin/snapshot";
+import { loadSeriesIndex } from "@/lib/admin/series";
+import { describeDays } from "@/lib/recurrence";
 import { formatDate, formatTime } from "@/lib/format";
 import { RETAILER_HOURLY_RATE } from "@/lib/pricing";
 import styles from "@/components/super-admin/Admin.module.css";
@@ -58,7 +60,7 @@ export default async function ShiftOperationsPage({
   // Shift dates are store wall-clock times, so the date filter is off by
   // default — operations usually want every shift, not a window.
   const range = parseRange(params, "all");
-  const snapshot = await loadSnapshot();
+  const [snapshot, seriesIndex] = await Promise.all([loadSnapshot(), loadSeriesIndex()]);
 
   const q = searchText(params.q);
   const status = (params.status ?? "any") as StatusFilter;
@@ -216,6 +218,7 @@ export default async function ShiftOperationsPage({
                     const status = SHIFT_STATUS[shift.status];
                     const payment = PAYMENT_STATUS[shift.payment_status];
                     const applicants = snapshot.applicationsByShift.get(shift.id) ?? [];
+                    const series = seriesIndex.get(shift.id);
 
                     return (
                       <tr key={shift.id}>
@@ -224,6 +227,9 @@ export default async function ShiftOperationsPage({
                             {shift.task_type}
                           </Link>
                           <span className={styles.sub}>{shift.shift_location ?? store?.address ?? "No location"}</span>
+                          {series ? (
+                            <span className={styles.sub}>Recurring · {describeDays(series.daysOfWeek)}</span>
+                          ) : null}
                         </td>
                         <td>
                           {store ? (
