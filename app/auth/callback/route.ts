@@ -15,6 +15,12 @@ export async function GET(request: NextRequest) {
     nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
 
   if (!code) {
+    // An expired or reused password-reset link arrives here with no code
+    // (Supabase adds `error` / `error_code` instead): offer a new link rather
+    // than a login page for one role. Signup confirmation links are unchanged.
+    if (next === "/reset-password") {
+      return NextResponse.redirect(`${origin}/forgot-password?error=expired_link`);
+    }
     return NextResponse.redirect(`${origin}/worker/login?error=invalid_link`);
   }
 

@@ -444,32 +444,120 @@ export async function requestPasswordReset(
   };
 }
 
+const EXPIRED_LINK =
+  "This reset link has expired or has already been used. Please request a new one.";
+
+/**
+ * Sets a new password from a password-reset email.
+ *
+ * Two ways in, both ending in a Supabase Auth session for the account being
+ * recovered:
+ *
+ *   - `tokenHash` (the branded email template links to
+ *     /reset-password?token_hash=…&type=recovery). The one-time token is only
+ *     verified HERE, when the user submits — so a mail scanner that "clicks"
+ *     the link cannot use it up, and it works on any device or browser.
+ *   - An existing session, from the older `/auth/callback?code=…` link.
+ *
+ * Supabase Auth stores and checks the password; nothing here touches roles,
+ * profiles or any other account data.
+ */
 export async function updatePassword(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  const tokenHash = str(formData.get("tokenHash"));
 
   const fieldErrors: FieldErrors = {};
   validatePassword(password, confirmPassword, fieldErrors);
+  // Validated before the token is verified, so a typo never uses up the link.
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) {
-    return { error: "This reset link has expired. Please request a new one." };
+
+  if (tokenHash) {
+    // Signs the browser in as the account the link was issued for — replacing
+    // any other session it held, so the right account's password changes.
+    const { error } = await supabase.auth.verifyOtp({
+      type: "recovery",
+      token_hash: tokenHash,
+    });
+    if (error) {
+      console.error("[updatePassword] verifyOtp:", error.code ?? error.message);
+      return { error: EXPIRED_LINK, values: { linkExpired: "1" } };
+    }
   }
 
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { error: error.message };
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { error: EXPIRED_LINK, values: { linkExpired: "1" } };
 
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    // The token (if any) is spent now, but the session it created is valid:
+    // the form retries on the session instead of the used token.
+    const retry = tokenHash ? { tokenConsumed: "1" } : undefined;
+    if (error.code === "same_password") {
+      return {
+        fieldErrors: { password: "Choose a password you haven't used for this account before." },
+        values: retry,
+      };
+    }
+    if (error.code === "weak_password") {
+      return {
+        fieldErrors: { password: "That password is too weak. Try a longer one with a mix of characters." },
+        values: retry,
+      };
+    }
+    console.error("[updatePassword] updateUser:", error.code ?? error.message);
+    return {
+      error: "We couldn't update your password. Please try again.",
+      values: retry,
+    };
+  }
+
+  // Anyone still signed in with the old password on another device is
+  // signed out. Best effort: the password itself is already changed.
+  try {
+    await supabase.auth.signOut({ scope: "others" });
+  } catch (signOutError) {
+    console.error("[updatePassword] signOut others:", signOutError);
+  }
+
+  revalidatePath("/", "layout");
+  return {
+    success: "Your password has been updated.",
+    redirectTo: await continuePathFor(supabase, userData.user.id),
+  };
+}
+
+/**
+ * Where the success screen sends the user. Read-only: it looks at the records
+ * signup already created and changes nothing.
+ */
+async function continuePathFor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string> {
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", userData.user.id)
+    .eq("id", userId)
     .maybeSingle();
+  if (profile?.role === "retailer") return "/retailer/dashboard";
 
-  revalidatePath("/", "layout");
-  redirect(profile?.role === "retailer" ? "/retailer/dashboard" : "/worker/dashboard");
+  const { data: worker } = await supabase
+    .from("workers")
+    .select("id")
+    .eq("auth_user_id", userId)
+    .maybeSingle();
+  if (worker) return "/worker/dashboard";
+
+  // Neither a worker nor a retailer — an operations (Super Admin) login, which
+  // signs in through its own page and keeps its own authorisation checks.
+  const { data: isAdmin } = await supabase.rpc("is_super_admin");
+  if (isAdmin === true) return "/super-admin";
+
+  return "/worker/login";
 }
