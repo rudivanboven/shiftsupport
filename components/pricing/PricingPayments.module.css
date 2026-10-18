@@ -248,13 +248,6 @@
   color: var(--brand-green);
 }
 
-.exampleNote {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: var(--muted);
-}
-
 .splitGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));

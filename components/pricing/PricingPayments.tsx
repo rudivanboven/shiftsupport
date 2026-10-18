@@ -302,7 +302,6 @@ export default function PricingPayments({
                 points={[
                   `${formatMoney(WORKER_HOURLY_RATE)} per hour is the worker gross hourly amount for completed work.`,
                   "Gross pay for a shift is the shift duration multiplied by this rate.",
-                  "Applicable payroll deductions are handled through the ShiftSupport employment model.",
                 ]}
               />
             </section>
@@ -312,32 +311,6 @@ export default function PricingPayments({
               description="From an active membership through to the record of a completed shift."
             >
               <FlowSteps steps={WORKER_FLOW} />
-            </Panel>
-
-            <Panel
-              title="A worked example"
-              description={`What a ${EXAMPLE_HOURS}-hour shift looks like for you.`}
-            >
-              <div className={styles.exampleGrid}>
-                <div className={styles.breakdown}>
-                  <BreakdownRow label="Shift duration" value={`${EXAMPLE_HOURS} hours`} />
-                  <BreakdownRow
-                    label="Worker gross rate"
-                    value={`${formatMoney(WORKER_HOURLY_RATE)}/hour`}
-                  />
-                  <BreakdownRow
-                    label="Worker gross"
-                    detail={`${EXAMPLE_HOURS} × ${formatMoney(WORKER_HOURLY_RATE)}`}
-                    value={formatMoney(example.workerGross)}
-                    strong
-                  />
-                </div>
-                <p className={styles.exampleNote}>
-                  Gross pay is always the hours you worked multiplied by the worker gross
-                  rate. The shift you are hired for shows its own duration, so you can see
-                  what a shift is worth before you apply.
-                </p>
-              </div>
             </Panel>
           </>
         ) : (
@@ -418,16 +391,10 @@ export default function PricingPayments({
                   <dd>{EXAMPLE_HOURS} hours</dd>
                 </div>
                 {isWorker ? (
-                  <>
-                    <div>
-                      <dt>Worker gross rate</dt>
-                      <dd>{formatMoney(WORKER_HOURLY_RATE)}/hour</dd>
-                    </div>
-                    <div className={styles.receiptTotal}>
-                      <dt>Worker gross</dt>
-                      <dd>{formatMoney(example.workerGross)}</dd>
-                    </div>
-                  </>
+                  <div>
+                    <dt>Worker gross rate</dt>
+                    <dd>{formatMoney(WORKER_HOURLY_RATE)}/hour</dd>
+                  </div>
                 ) : (
                   <>
                     <div>
