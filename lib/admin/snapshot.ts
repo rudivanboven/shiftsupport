@@ -40,6 +40,30 @@ export interface AdminWorker {
   membership_cancel_at_period_end: boolean | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  /**
+   * Derived in `loadSnapshot` from `worker_signup_payments` (migration 0013):
+   * when the one-time signup fee was paid, and what was charged. Null for
+   * grandfathered workers and legacy subscribers.
+   */
+  signup_paid_at: string | null;
+  signup_fee_cents: number | null;
+}
+
+/**
+ * One row of `worker_signup_payments` — the $1 one-time signup fee.
+ * `worker_id` is null once the worker account has been deleted (the payment
+ * record outlives the account).
+ */
+export interface AdminSignupPayment {
+  id: string;
+  worker_id: string | null;
+  stripe_checkout_session_id: string;
+  stripe_payment_intent_id: string | null;
+  amount_cents: number;
+  currency: string;
+  status: "pending" | "paid" | "failed" | "canceled";
+  paid_at: string | null;
+  created_at: string;
 }
 
 export interface AdminProfile {
@@ -169,11 +193,13 @@ export interface Snapshot {
   shifts: AdminShift[];
   applications: AdminApplication[];
   payments: AdminPayment[];
+  /** One-time worker signup fees (migration 0013). Kept apart from shift money. */
+  signupPayments: AdminSignupPayment[];
   reviews: AdminReview[];
   timeEntries: AdminTimeEntry[];
   payrollIds: { worker_id: string; provider: string; external_employee_id: string }[];
   accepts: AdminShiftAccept[];
-  /** Tables that could not be read (e.g. migration 0010 not yet applied). */
+  /** Tables that could not be read (e.g. migration 0010 or 0013 not yet applied). */
   warnings: string[];
 
   workerById: Map<string, AdminWorker>;
@@ -230,7 +256,7 @@ export const loadSnapshot = cache(async (): Promise<Snapshot> => {
   const db = await adminDb();
   const warnings: string[] = [];
 
-  const [workers, profiles, stores, storeUsers, shifts, applications, payments, reviews, timeEntries, payrollIds, accepts] =
+  const [workers, profiles, stores, storeUsers, shifts, applications, payments, reviews, timeEntries, payrollIds, accepts, signupPayments] =
     await Promise.all([
       readAll<AdminWorker>(db, "workers",
         "id,full_name,email,phone,created_at,auth_user_id,membership_status,membership_started_at,membership_expires_at,membership_cancel_at_period_end,stripe_customer_id,stripe_subscription_id",
@@ -251,7 +277,25 @@ export const loadSnapshot = cache(async (): Promise<Snapshot> => {
         "created_at", warnings),
       readAll<{ worker_id: string; provider: string; external_employee_id: string }>(db, "worker_payroll_identities", "worker_id,provider,external_employee_id", "worker_id", warnings, "provider"),
       readAll<AdminShiftAccept>(db, "shift_accepts", "shift_id,worker_id,accepted_at", "accepted_at", warnings),
+      readAll<AdminSignupPayment>(db, "worker_signup_payments",
+        "id,worker_id,stripe_checkout_session_id,stripe_payment_intent_id,amount_cents,currency,status,paid_at,created_at",
+        "created_at", warnings),
     ]);
+
+  // The one-time signup fee each worker paid (the earliest paid row wins if
+  // there is somehow more than one), pinned onto the worker so every
+  // membership derivation can see it without a second lookup.
+  const paidSignupByWorker = new Map<string, AdminSignupPayment>();
+  for (const p of signupPayments) {
+    if (p.status !== "paid" || !p.paid_at || !p.worker_id) continue;
+    const previous = paidSignupByWorker.get(p.worker_id);
+    if (!previous || p.paid_at < previous.paid_at!) paidSignupByWorker.set(p.worker_id, p);
+  }
+  for (const w of workers) {
+    const paid = paidSignupByWorker.get(w.id);
+    w.signup_paid_at = paid?.paid_at ?? null;
+    w.signup_fee_cents = paid?.amount_cents ?? null;
+  }
 
   // numeric columns come back as strings from PostgREST in some setups
   for (const s of shifts) s.duration = Number(s.duration) || 0;
@@ -271,7 +315,7 @@ export const loadSnapshot = cache(async (): Promise<Snapshot> => {
   }
 
   return {
-    workers, profiles, stores, storeUsers, shifts, applications, payments, reviews, timeEntries, payrollIds, accepts, warnings,
+    workers, profiles, stores, storeUsers, shifts, applications, payments, signupPayments, reviews, timeEntries, payrollIds, accepts, warnings,
     workerById: new Map(workers.map((w) => [w.id, w])),
     profileById: new Map(profiles.map((p) => [p.id, p])),
     storeById: new Map(stores.map((s) => [s.id, s])),
@@ -300,8 +344,9 @@ export type MembershipView =
 
 /**
  * What a worker's membership actually means, from the stored Stripe state.
- * `complimentary` = access without a Stripe subscription (the workers kept on
- * by migration 0008) — active, but not a paid membership.
+ * `paid_active` = access backed by a Stripe subscription (legacy $18/year) or
+ * by a paid one-time signup fee (migration 0013). `complimentary` = access
+ * with neither (the workers kept on by migration 0008) — active, but not paid.
  */
 export function membershipView(w: AdminWorker): MembershipView {
   const status = w.membership_status ?? "inactive";
@@ -309,7 +354,7 @@ export function membershipView(w: AdminWorker): MembershipView {
   if (status === "past_due") return access ? "past_due" : "expired";
   if (status === "active") {
     if (!access) return "expired";
-    return w.stripe_subscription_id ? "paid_active" : "complimentary";
+    return w.stripe_subscription_id || w.signup_paid_at ? "paid_active" : "complimentary";
   }
   if (status === "canceled") return "canceled";
   return "inactive";

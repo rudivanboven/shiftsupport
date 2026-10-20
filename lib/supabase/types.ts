@@ -47,6 +47,26 @@ export interface Worker {
   membership_updated_at?: string | null;
 }
 
+/**
+ * The $1 one-time worker signup fee (migration 0013): one row per Stripe
+ * Checkout session. Written only by Stripe-verified fulfillment; a worker can
+ * read their own row minus the Stripe identifiers. `worker_id` becomes null
+ * if the worker account is deleted — the payment record outlives the account.
+ */
+export interface WorkerSignupPayment {
+  id: string;
+  worker_id: string | null;
+  stripe_checkout_session_id: string;
+  stripe_payment_intent_id: string | null;
+  stripe_customer_id: string | null;
+  amount_cents: number;
+  currency: string;
+  status: "pending" | "paid" | "failed" | "canceled";
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Store {
   id: string;
   name: string;

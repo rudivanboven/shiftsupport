@@ -7,11 +7,37 @@
  * this module — the number is never typed into a form or taken from a request.
  */
 
-/** What a worker pays, once, for twelve months of membership. */
-export const WORKER_ANNUAL_MEMBERSHIP = 18;
+/* ------------------------------------------------------------------ *
+ * Worker signup fee — DISPLAY ONLY
+ * ------------------------------------------------------------------ *
+ *
+ * What a worker pays, once, to join ShiftSupport. Confirmed by the client on
+ * 2026-10-20: a $1 one-time signup fee, with no yearly recurring membership
+ * fee and no renewal messaging. This number is only ever rendered in the UI.
+ *
+ * It is NOT what Stripe charges. The Checkout in `app/actions/billing.ts`
+ * charges whatever price `STRIPE_WORKER_MEMBERSHIP_PRICE_ID` names (now a
+ * one-time $1 price, `mode: "payment"`); fulfillment logs a warning if the
+ * amount Stripe confirms ever differs from this number. Nothing in this
+ * module feeds Stripe, so changing this constant cannot change what anyone
+ * is billed — change the Stripe price and this constant together.
+ */
+export const WORKER_SIGNUP_FEE = 1;
 
-/** How long a worker membership stays active, in months. */
-export const MEMBERSHIP_MONTHS = 12;
+/**
+ * Whether the signup Checkout button is offered at all is decided by
+ * `isWorkerSignupCheckoutEnabled()` in `lib/signup-checkout.ts` — a
+ * server-only module driven by the `WORKER_SIGNUP_CHECKOUT_ENABLED`
+ * environment variable, off by default. It is not in this file because this
+ * module is shared with client components, and the decision reads server
+ * environment that must never reach the browser.
+ *
+ * Shown wherever the Checkout button would otherwise be, while it is off.
+ * Everything else — worker login, the billing portal for existing members,
+ * retailer shift checkout — is unaffected.
+ */
+export const WORKER_SIGNUP_CHECKOUT_UNAVAILABLE =
+  "Worker signup payments are temporarily unavailable while we update our payment system. You won't be charged anything until they're back — please check again soon.";
 
 /** What a retailer is charged, per hour, for a shift. */
 export const RETAILER_HOURLY_RATE = 28;

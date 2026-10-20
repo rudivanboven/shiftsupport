@@ -152,8 +152,8 @@ export default async function WorkersPage({
                       <td>
                         <Badge tone={MEMBERSHIP_TONES[row.membership]}>{MEMBERSHIP_LABELS[row.membership]}</Badge>
                         {row.membershipExpiresAt ? (
-                          <span className={styles.sub}>Renews/ends {formatDate(row.membershipExpiresAt)}</span>
-                        ) : row.membership === "complimentary" ? (
+                          <span className={styles.sub}>Access until {formatDate(row.membershipExpiresAt)}</span>
+                        ) : row.membership === "complimentary" || row.membership === "paid_active" ? (
                           <span className={styles.sub}>No expiry</span>
                         ) : null}
                       </td>

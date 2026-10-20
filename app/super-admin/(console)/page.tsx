@@ -77,7 +77,7 @@ export default async function OperationsDashboard({
           <Metric
             label="Paid memberships"
             value={s.workers.paidMemberships}
-            hint="Active Stripe subscription"
+            hint="One-time signup fee paid, or an active Stripe subscription"
             href="/super-admin/workers?membership=paid_active"
           />
           <Metric

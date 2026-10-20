@@ -3,8 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { requireRetailer, requireWorker } from "@/lib/auth/session";
+import { getMembership } from "@/lib/membership";
 import { getSiteUrl } from "@/lib/site";
-import { priceShift } from "@/lib/pricing";
+import {
+  WORKER_SIGNUP_CHECKOUT_UNAVAILABLE,
+  WORKER_SIGNUP_FEE,
+  priceShift,
+} from "@/lib/pricing";
+import { isWorkerSignupCheckoutEnabled } from "@/lib/signup-checkout";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   CHECKOUT_KIND,
@@ -17,6 +23,9 @@ import {
   applyShiftCheckoutFailed,
   applyMembershipCheckout,
   applySubscription,
+  hasLiveLegacySubscription,
+  openSignupSessionUrl,
+  recordSignupCheckoutStarted,
 } from "@/lib/stripe/fulfillment";
 
 /**
@@ -44,7 +53,7 @@ function fail(error: string): ActionResult {
 }
 
 /* ------------------------------------------------------------------ *
- * Worker — membership subscription
+ * Worker — one-time signup fee (and the legacy subscriptions' portal)
  * ------------------------------------------------------------------ */
 
 /**
@@ -93,16 +102,99 @@ async function ensureCustomer(worker: {
   return customer.id;
 }
 
-/** Starts the $18/year membership subscription checkout for the signed-in worker. */
+/**
+ * Price ids already confirmed to be the one-time $1 USD price, per server
+ * process. A Stripe price's amount, currency and type are immutable, so one
+ * check per id is enough; only `active` can change, and a deactivated price
+ * is rejected by Checkout itself.
+ */
+const verifiedSignupPrices = new Set<string>();
+
+/**
+ * Refuses to open Checkout unless the configured price really is the one the
+ * website advertises: active, one-time, USD, `WORKER_SIGNUP_FEE`. The amount
+ * a worker is charged must never depend on an environment variable being
+ * set correctly by hand.
+ */
+async function verifySignupPrice(priceId: string): Promise<void> {
+  if (verifiedSignupPrices.has(priceId)) return;
+
+  const price = await getStripe().prices.retrieve(priceId);
+  const expectedCents = Math.round(WORKER_SIGNUP_FEE * 100);
+  const ok =
+    price.active &&
+    price.type === "one_time" &&
+    price.currency === "usd" &&
+    price.unit_amount === expectedCents;
+
+  if (!ok) {
+    throw new Error(
+      `STRIPE_WORKER_MEMBERSHIP_PRICE_ID (${priceId}) is not an active one-time USD ${expectedCents}-cent price ` +
+        `(active=${price.active}, type=${price.type}, currency=${price.currency}, unit_amount=${price.unit_amount}). ` +
+        "Worker signup checkout refused.",
+    );
+  }
+
+  verifiedSignupPrices.add(priceId);
+}
+
+/**
+ * How long a signup Checkout page stays open before Stripe expires it.
+ * Stripe's minimum is 30 minutes measured on arrival, so a little margin
+ * keeps a slow request from being rejected.
+ */
+const SIGNUP_SESSION_TTL_SECONDS = 35 * 60;
+
+/**
+ * Starts the one-time signup fee Checkout for the signed-in worker.
+ *
+ * `mode: "payment"` with the price from `STRIPE_WORKER_MEMBERSHIP_PRICE_ID`,
+ * which must be a ONE-TIME price. Stripe rejects a recurring price in payment
+ * mode, and `verifySignupPrice` rejects any one-time price that is not the
+ * advertised $1, so a wrong environment value fails loudly here rather than
+ * charging the wrong amount. Access is granted by `applySignupCheckout` once
+ * Stripe confirms the payment — never from this function.
+ */
 export async function startMembershipCheckout(): Promise<ActionResult> {
   const { user, profile, worker } = await requireWorker();
+
+  // Kill-switch (see lib/signup-checkout). Checked here as well as in the UI,
+  // so a hand-made request cannot open a Checkout while the button is withheld.
+  if (!isWorkerSignupCheckoutEnabled()) {
+    return fail(WORKER_SIGNUP_CHECKOUT_UNAVAILABLE);
+  }
 
   if (!isStripeConfigured()) {
     console.error("[billing] Membership checkout requested but Stripe is not configured.");
     return fail(STRIPE_UNAVAILABLE);
   }
 
+  // Paid once means paid once: a worker who already has access — a one-time
+  // payer, a grandfathered worker or a live $18/year subscriber — is never
+  // sent to Checkout again.
+  const membership = await getMembership(worker.id);
+  if (membership.active) {
+    return fail("Your membership is already active — there is nothing to pay.");
+  }
+
   try {
+    // A legacy $18/year subscription that Stripe still considers live (past
+    // due with retries running, or a renewal the webhook has not reported
+    // yet) is handled in the billing portal. Paying the one-time fee over the
+    // top of it would leave the worker billed twice.
+    if (await hasLiveLegacySubscription(worker.id)) {
+      return fail(
+        "You already have a yearly membership on file. Use Manage membership to update or cancel it — there is nothing new to pay.",
+      );
+    }
+
+    // A worker who abandoned Checkout and came back gets the session they
+    // already have, so two tabs cannot end in two charges.
+    const existingUrl = await openSignupSessionUrl(worker.id);
+    if (existingUrl) return { ok: true, url: existingUrl };
+
+    await verifySignupPrice(membershipPriceId());
+
     const customerId = await ensureCustomer({
       id: worker.id,
       authUserId: user.id,
@@ -112,8 +204,16 @@ export async function startMembershipCheckout(): Promise<ActionResult> {
 
     const origin = await getSiteUrl();
 
+    // Attached to the session and the PaymentIntent, so fulfillment can find
+    // the worker from Stripe's own objects rather than from the browser.
+    const metadata = {
+      kind: CHECKOUT_KIND.workerMembership,
+      auth_user_id: user.id,
+      worker_id: worker.id,
+    };
+
     const session = await getStripe().checkout.sessions.create({
-      mode: "subscription",
+      mode: "payment",
       customer: customerId,
       // The price is read from the server environment only — a price id in the
       // request would be ignored, because nothing here looks at one.
@@ -121,22 +221,19 @@ export async function startMembershipCheckout(): Promise<ActionResult> {
       success_url: `${origin}/worker/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/worker/pricing?checkout=canceled`,
       client_reference_id: user.id,
-      metadata: {
-        kind: CHECKOUT_KIND.workerMembership,
-        auth_user_id: user.id,
-        worker_id: worker.id,
-      },
-      subscription_data: {
-        metadata: {
-          kind: CHECKOUT_KIND.workerMembership,
-          auth_user_id: user.id,
-          worker_id: worker.id,
-        },
-      },
+      metadata,
+      payment_intent_data: { metadata },
       allow_promotion_codes: true,
+      // A forgotten tab dies in about half an hour instead of Stripe's 24h
+      // default, which keeps the window for a stale second session small.
+      expires_at: Math.floor(Date.now() / 1000) + SIGNUP_SESSION_TTL_SECONDS,
     });
 
     if (!session.url) return fail(STRIPE_UNAVAILABLE);
+
+    // Bookkeeping only; the session is already live whether or not this lands.
+    await recordSignupCheckoutStarted(worker.id, session);
+
     return { ok: true, url: session.url };
   } catch (error) {
     console.error("[billing] startMembershipCheckout failed:", error);
@@ -187,8 +284,11 @@ export async function openBillingPortal(): Promise<ActionResult> {
  *
  * Used by the success screen so a worker is not left staring at "confirming…"
  * if the webhook is slow, misconfigured, or not reachable in development.
- * It never trusts the redirect: the session/subscription is fetched from
- * Stripe and run through the same fulfillment code the webhook uses.
+ * It never trusts the redirect: the session is fetched from Stripe and run
+ * through the same fulfillment code the webhook uses (a one-time signup
+ * session activates through `applySignupCheckout`; an old subscription
+ * session through `applySubscription`). Without a session id there is only
+ * something to re-read for a legacy subscriber.
  */
 export async function syncMembership(sessionId?: string): Promise<{ ok: boolean }> {
   const { worker } = await requireWorker();

@@ -185,3 +185,36 @@ Existing shifts get `series_id = NULL` and stay one-time shifts.
 | `shifts_series_guard` | Trigger: a shift can only join a series of its own store. |
 | `shift_series_enforce_assignment` | Trigger: a browser session cannot set or change `assigned_worker_id` (or move a series to another store); only `hire_applicant` can. |
 | RLS | `shift_series`: store members read/insert/update their own; a worker reads a series only while they can see one of its dates (the same rule as `shifts_select`) or are its kept worker. No delete policy. No existing policy is touched. |
+
+## What 0013 does
+
+The $1 one-time worker signup fee (replacing the $18/year membership
+subscription for new workers). Additive and idempotent: one new table, nothing
+existing touched.
+
+| Area | Change |
+| --- | --- |
+| `worker_signup_payments` | New table: one row per signup Checkout session — worker, Stripe session / payment intent / customer ids, amount, `status` (`pending` / `paid` / `failed` / `canceled`), `paid_at`. Unique on the session id, so a replayed webhook updates the same row. |
+| `workers` | Unchanged. A worker who pays is stored as `membership_status = 'active'` with `membership_expires_at = NULL` (the shape 0008 uses), so `membership_grants_access()` and every policy that calls it are untouched. |
+| Legacy subscribers | Unchanged. `stripe_subscription_id`, the period end and the cancel flag stay on the row and keep following Stripe's subscription events. Nothing cancels or alters those subscriptions. |
+| RLS | A worker may `select` their own row (amount, status, date — not the Stripe ids). No insert / update / delete policy: all writes come from Stripe-verified fulfillment with the service role. |
+
+Until 0013 is applied the app still works: a paid signup activates the worker,
+but the payment is not recorded and the Super Admin lists that worker as
+"Complimentary" instead of paid (with `worker_signup_payments` in its
+"could not be read" banner).
+
+## What 0014 does
+
+Closes a gap that predates the $1 signup fee: migration 0001 granted
+`update` on the whole `workers` table to `authenticated`, and nothing pinned
+the membership columns 0007 added, so a worker could set
+`membership_status = 'active'` on their own row through the REST API and
+gain marketplace access without paying. No data is modified; idempotent.
+
+| Area | Change |
+| --- | --- |
+| Column privileges | The table-wide UPDATE grant becomes `grant update (full_name, email, phone, updated_at)`. An API update that names any other column fails with `42501`. INSERT is left as in 0001 (signup provisioning uses the service role; the trigger resets the protected columns on any API insert). |
+| `workers_enforce_membership_state` | New `before insert or update` trigger: for the `authenticated` / `anon` roles it pins `stripe_customer_id`, `stripe_subscription_id` and every `membership_*` column to the existing row (or to "no membership" on insert). The service role, the SQL editor and SECURITY DEFINER functions pass through, so Stripe fulfillment, `ensureCustomer`, signup provisioning and operator SQL are unchanged. |
+| RLS | Untouched. Policies still decide which rows a worker may update; this migration decides which columns. |
+| Verification | `supabase/verification/0014_verify_membership_protection.sql` impersonates a real worker inside a transaction, attempts the tampering, confirms profile editing still works, proves the trigger holds even with a widened grant, and ends in `ROLLBACK`. |

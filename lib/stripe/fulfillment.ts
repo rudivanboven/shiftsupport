@@ -3,7 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { priceShift } from "@/lib/pricing";
+import { WORKER_SIGNUP_FEE, priceShift } from "@/lib/pricing";
 import { CHECKOUT_KIND, getStripe } from "./client";
 
 /**
@@ -70,7 +70,351 @@ export async function releaseStripeEvent(eventId: string) {
 }
 
 /* ------------------------------------------------------------------ *
- * Worker membership
+ * Worker signup fee — one-time payment (migration 0013)
+ * ------------------------------------------------------------------ */
+
+const SIGNUP_LEDGER = "worker_signup_payments";
+
+/**
+ * "The table is not there yet" — migration 0013 has not been applied. The
+ * code paths below degrade loudly rather than failing, so a worker who has
+ * paid is never locked out by a missing ledger.
+ */
+function isMissingLedger(error: { code?: string; message?: string } | null | undefined) {
+  if (!error) return false;
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
+  const message = error.message ?? "";
+  return message.includes(SIGNUP_LEDGER) && /schema cache|does not exist/i.test(message);
+}
+
+/**
+ * True when this worker has paid the one-time signup fee. Their access does
+ * not come from a subscription, so the subscription webhooks (an older
+ * $18/year subscription on the same worker ending, say) must never take it
+ * away. Fails safe to `false` if the ledger cannot be read.
+ */
+export async function hasPaidSignupFee(supabase: Admin, workerId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from(SIGNUP_LEDGER)
+    .select("id")
+    .eq("worker_id", workerId)
+    .eq("status", "paid")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    if (!isMissingLedger(error)) {
+      console.error("[stripe] Could not read the signup ledger:", error.message);
+    }
+    return false;
+  }
+  return Boolean(data?.id);
+}
+
+/**
+ * The URL of a signup Checkout session this worker already has open, if any.
+ *
+ * A worker who abandoned Checkout in one tab and clicks again in another must
+ * land on the same session: two open sessions would be two $1 charges, since
+ * each one is fulfilled independently. Mirrors the retailer flow's reuse of a
+ * pending shift payment. Returns null when there is nothing to reuse (or the
+ * ledger cannot be read), and the caller creates a fresh session.
+ */
+export async function openSignupSessionUrl(workerId: string): Promise<string | null> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from(SIGNUP_LEDGER)
+    .select("stripe_checkout_session_id")
+    .eq("worker_id", workerId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  if (error) {
+    if (!isMissingLedger(error)) {
+      console.error("[stripe] Could not read pending signup sessions:", error.message);
+    }
+    return null;
+  }
+
+  for (const row of (data ?? []) as { stripe_checkout_session_id: string }[]) {
+    try {
+      const session = await getStripe().checkout.sessions.retrieve(row.stripe_checkout_session_id);
+      const stillOpen =
+        session.status === "open" &&
+        Boolean(session.url) &&
+        (!session.expires_at || session.expires_at * 1000 > Date.now());
+      if (stillOpen) return session.url as string;
+    } catch {
+      // Gone or unreadable: not reusable, try the next one.
+    }
+  }
+
+  return null;
+}
+
+/**
+ * True while this worker still has a live legacy $18/year subscription:
+ * anything Stripe does not consider finished (`active`, `trialing`,
+ * `past_due` with Smart Retries still running, `unpaid`, `incomplete`,
+ * `paused`). Such a worker must manage that subscription in the portal,
+ * not pay the one-time fee on top of it and then be billed twice. Fails safe
+ * to `false` only when there is no subscription on record or Stripe no
+ * longer knows it.
+ */
+export async function hasLiveLegacySubscription(workerId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+
+  const { data } = await supabase
+    .from("workers")
+    .select("stripe_subscription_id")
+    .eq("id", workerId)
+    .maybeSingle();
+
+  const subscriptionId = (data as { stripe_subscription_id: string | null } | null)
+    ?.stripe_subscription_id;
+  if (!subscriptionId) return false;
+
+  try {
+    const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
+    return subscription.status !== "canceled" && subscription.status !== "incomplete_expired";
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "resource_missing") return false;
+    // Unknown error: assume live, so a transient Stripe problem cannot lead
+    // to a double charge.
+    console.error("[stripe] Could not read legacy subscription:", error);
+    return true;
+  }
+}
+
+/**
+ * Records that a signup Checkout session was opened, so an abandoned, expired
+ * or failed session leaves a trace. Non-fatal: the ledger is bookkeeping, the
+ * Stripe session itself is what the worker is sent to.
+ */
+export async function recordSignupCheckoutStarted(
+  workerId: string,
+  session: Stripe.Checkout.Session,
+) {
+  const supabase = createAdminClient();
+  const now = new Date().toISOString();
+
+  const { error } = await supabase.from(SIGNUP_LEDGER).upsert(
+    {
+      worker_id: workerId,
+      stripe_checkout_session_id: session.id,
+      stripe_customer_id:
+        typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
+      amount_cents: session.amount_total ?? Math.round(WORKER_SIGNUP_FEE * 100),
+      currency: session.currency ?? "usd",
+      status: "pending",
+      updated_at: now,
+    },
+    { onConflict: "stripe_checkout_session_id" },
+  );
+
+  if (error) {
+    console.error(
+      isMissingLedger(error)
+        ? "[stripe] Signup checkout opened but not recorded: migration 0013 has not been applied."
+        : `[stripe] Could not record the pending signup payment: ${error.message}`,
+    );
+  }
+}
+
+/**
+ * Finds the worker a signup Checkout session belongs to, from the ids we
+ * attached ourselves when the session was created — never from anything the
+ * customer could have typed.
+ */
+async function findWorkerForSession(
+  supabase: Admin,
+  session: Stripe.Checkout.Session,
+): Promise<string | null> {
+  const workerId = session.metadata?.worker_id;
+  if (workerId) {
+    const byId = await supabase.from("workers").select("id").eq("id", workerId).maybeSingle();
+    if (byId.data?.id) return byId.data.id as string;
+  }
+
+  const authUserId = session.metadata?.auth_user_id;
+  if (authUserId) {
+    const byAuthUser = await supabase
+      .from("workers")
+      .select("id")
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
+    if (byAuthUser.data?.id) return byAuthUser.data.id as string;
+  }
+
+  const customerId =
+    typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
+  if (customerId) {
+    const byCustomer = await supabase
+      .from("workers")
+      .select("id")
+      .eq("stripe_customer_id", customerId)
+      .maybeSingle();
+    if (byCustomer.data?.id) return byCustomer.data.id as string;
+  }
+
+  return null;
+}
+
+/**
+ * A paid one-time signup Checkout session: activate the worker's membership
+ * with no expiry, then record the payment.
+ *
+ * Idempotent: the membership write is "set to active" (not an increment) and
+ * the ledger row is keyed by the Checkout session, so Stripe redelivering the
+ * event, or the success screen re-reading the session while the webhook is
+ * also running, converges on the same row.
+ */
+export async function applySignupCheckout(session: Stripe.Checkout.Session) {
+  const supabase = createAdminClient();
+  const now = new Date().toISOString();
+
+  // `checkout.session.completed` arrives before a delayed payment method has
+  // settled; `checkout.session.async_payment_succeeded` comes back through
+  // here with `paid`. Nothing is activated until Stripe says paid — or says
+  // there was nothing to pay (`no_payment_required`), which is what a 100%
+  // promotion code produces on a completed session.
+  const settled =
+    session.payment_status === "paid" ||
+    (session.payment_status === "no_payment_required" && session.status === "complete");
+  if (!settled) {
+    return { matched: false as const, reason: `payment_status:${session.payment_status}` };
+  }
+
+  const workerId = await findWorkerForSession(supabase, session);
+  if (!workerId) {
+    console.warn(`[stripe] Signup session ${session.id} could not be matched to a worker.`);
+    return { matched: false as const, reason: "no_worker" };
+  }
+
+  const amountCents = session.amount_total ?? 0;
+  const expectedCents = Math.round(WORKER_SIGNUP_FEE * 100);
+  // A promotion code can legitimately lower the amount; anything else is
+  // made loud but still honoured — the worker really was charged.
+  if (amountCents !== expectedCents) {
+    console.warn(
+      `[stripe] Signup fee for worker ${workerId}: charged ${amountCents} cents, list price ${expectedCents}.`,
+    );
+  }
+
+  const customerId =
+    typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id ?? null;
+
+  // 1. Access — written first, so a ledger problem can never leave a worker
+  //    who has paid locked out.
+  const { data: current } = await supabase
+    .from("workers")
+    .select("membership_status,membership_started_at,stripe_customer_id")
+    .eq("id", workerId)
+    .maybeSingle();
+
+  const row = current as {
+    membership_status: string | null;
+    membership_started_at: string | null;
+    stripe_customer_id: string | null;
+  } | null;
+
+  const { error: accessError } = await supabase
+    .from("workers")
+    .update({
+      membership_status: "active",
+      // A replay keeps the original start; a fresh (or re-)activation starts now.
+      membership_started_at:
+        row?.membership_status === "active" && row.membership_started_at
+          ? row.membership_started_at
+          : now,
+      // Paid once: no period end and nothing to renew.
+      membership_expires_at: null,
+      membership_cancel_at_period_end: false,
+      stripe_customer_id: customerId ?? row?.stripe_customer_id ?? null,
+      membership_updated_at: now,
+      // `stripe_subscription_id` is deliberately left alone: an older
+      // $18/year subscription on this worker stays on record, untouched.
+    })
+    .eq("id", workerId);
+
+  if (accessError) throw new Error(`Could not activate membership: ${accessError.message}`);
+
+  // 2. The payment record. A replay (webhook redelivery, or the worker
+  //    reloading the success URL later) must not move `paid_at`: the first
+  //    time this session was seen paid is the date that stays.
+  const { data: priorRow } = await supabase
+    .from(SIGNUP_LEDGER)
+    .select("status,paid_at")
+    .eq("stripe_checkout_session_id", session.id)
+    .maybeSingle();
+  const prior = priorRow as { status: string; paid_at: string | null } | null;
+  const paidAt = prior?.status === "paid" && prior.paid_at ? prior.paid_at : now;
+
+  const { error: ledgerError } = await supabase.from(SIGNUP_LEDGER).upsert(
+    {
+      worker_id: workerId,
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id: paymentIntentId,
+      stripe_customer_id: customerId,
+      amount_cents: amountCents,
+      currency: session.currency ?? "usd",
+      status: "paid",
+      paid_at: paidAt,
+      updated_at: now,
+    },
+    { onConflict: "stripe_checkout_session_id" },
+  );
+
+  if (ledgerError) {
+    if (isMissingLedger(ledgerError)) {
+      console.error(
+        `[stripe] Signup fee for worker ${workerId} activated but NOT recorded: migration 0013 has not been applied.`,
+      );
+    } else {
+      // Access is already granted; throwing makes Stripe retry the ledger write.
+      throw new Error(`Could not record the signup payment: ${ledgerError.message}`);
+    }
+  }
+
+  console.info(`[stripe] Worker ${workerId} paid the signup fee (${amountCents} cents).`);
+  return { matched: true as const, workerId, status: "active" as const };
+}
+
+/**
+ * `checkout.session.expired` / `checkout.session.async_payment_failed` for a
+ * signup session. Nothing was activated, so only the ledger row changes.
+ */
+export async function applySignupCheckoutFailed(
+  session: Stripe.Checkout.Session,
+  status: "failed" | "canceled" = "canceled",
+) {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from(SIGNUP_LEDGER)
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("stripe_checkout_session_id", session.id)
+    .neq("status", "paid");
+
+  if (error && !isMissingLedger(error)) {
+    console.error("[stripe] Could not mark the signup payment as failed:", error.message);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Worker membership — legacy $18/year subscriptions
+ *
+ * Nothing new is created on this path any more (Checkout now runs in
+ * payment mode), but the subscriptions that already exist keep renewing,
+ * failing and cancelling through Stripe, and these handlers keep following
+ * them. Existing subscriptions are never cancelled or modified from here.
  * ------------------------------------------------------------------ */
 
 export type MembershipStatus = "inactive" | "active" | "past_due" | "canceled";
@@ -188,6 +532,27 @@ export async function applySubscription(subscription: Stripe.Subscription) {
       ? subscription.customer
       : subscription.customer?.id ?? null;
 
+  // A worker who has paid the one-time signup fee owns their access outright.
+  // Keep the subscription reference current, but never let this subscription's
+  // state (a cancellation, a failed renewal) overwrite that access.
+  if (await hasPaidSignupFee(supabase, workerId)) {
+    const { error } = await supabase
+      .from("workers")
+      .update({
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscription.id,
+        membership_cancel_at_period_end: false,
+        membership_updated_at: new Date().toISOString(),
+      })
+      .eq("id", workerId);
+
+    if (error) throw new Error(`Could not update membership: ${error.message}`);
+    console.info(
+      `[stripe] Subscription ${subscription.id} is ${subscription.status}; worker ${workerId} keeps access from their one-time signup fee.`,
+    );
+    return { matched: true as const, workerId, status: "active" as const };
+  }
+
   const { error } = await supabase
     .from("workers")
     .update({
@@ -211,6 +576,15 @@ export async function applySubscriptionDeleted(subscription: Stripe.Subscription
   const supabase = createAdminClient();
   const workerId = await findWorkerForSubscription(supabase, subscription);
   if (!workerId) return { matched: false as const };
+
+  // The one-time signup fee outlives any subscription: see applySubscription.
+  if (await hasPaidSignupFee(supabase, workerId)) {
+    await supabase
+      .from("workers")
+      .update({ membership_cancel_at_period_end: false, membership_updated_at: new Date().toISOString() })
+      .eq("id", workerId);
+    return { matched: true as const, workerId };
+  }
 
   const { error } = await supabase
     .from("workers")
@@ -259,10 +633,17 @@ function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
 }
 
 /**
- * A completed membership Checkout session. The subscription is re-read from
- * Stripe rather than trusting the session payload alone.
+ * A completed membership Checkout session.
+ *
+ * Since the move to the one-time signup fee, every session this app creates
+ * is `mode: "payment"` and goes to `applySignupCheckout`. The subscription
+ * branch below is kept for sessions created before that change (a worker who
+ * finished an old `subscription` Checkout after the deploy) — it re-reads the
+ * subscription from Stripe rather than trusting the session payload alone.
  */
 export async function applyMembershipCheckout(session: Stripe.Checkout.Session) {
+  if (session.mode === "payment") return applySignupCheckout(session);
+
   if (session.payment_status === "unpaid") return { matched: false as const };
 
   const subscriptionId =
