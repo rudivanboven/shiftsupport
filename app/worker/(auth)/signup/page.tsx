@@ -17,7 +17,7 @@ export default async function WorkerSignupPage() {
       asideTitle="Real shifts. Real pay. On your schedule."
       asideText="Sign up once, then browse short retail shifts posted by local stores. Apply to the ones that suit you and get an answer fast."
       points={[
-        "Free to join — no fees, ever",
+        "Free to join — no fees",
         "Apply to a shift in a single tap",
         "Store contact details as soon as you're hired",
       ]}
