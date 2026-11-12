@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 
-import { getStripe, isStripeConfigured, webhookSecret } from "@/lib/stripe/client";
+import { CHECKOUT_KIND, getStripe, isStripeConfigured, webhookSecret } from "@/lib/stripe/client";
 import {
   applyCheckoutSession,
   applyInvoicePaymentFailed,
   applyShiftCheckoutFailed,
+  applySignupCheckoutFailed,
   applySubscription,
   applySubscriptionDeleted,
   claimStripeEvent,
@@ -100,14 +101,22 @@ async function handleEvent(event: Stripe.Event) {
     case "checkout.session.expired":
     case "checkout.session.async_payment_failed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      if (session.metadata?.kind === "retailer_shift") {
-        await applyShiftCheckoutFailed(
-          session,
-          event.type === "checkout.session.expired" ? "canceled" : "failed",
-        );
+      const outcome = event.type === "checkout.session.expired" ? "canceled" : "failed";
+      if (session.metadata?.kind === CHECKOUT_KIND.retailerShift) {
+        await applyShiftCheckoutFailed(session, outcome);
+      } else if (
+        session.metadata?.kind === CHECKOUT_KIND.workerMembership &&
+        session.mode === "payment"
+      ) {
+        // A one-time signup fee that did not go through: nothing was
+        // activated, so only the payment record is marked.
+        await applySignupCheckoutFailed(session, outcome);
       }
       return;
     }
+
+    // ---- Legacy $18/year subscriptions only. New signups are one-time
+    //      payments and never produce these events. ----------------------
 
     case "customer.subscription.created":
     case "customer.subscription.updated": {

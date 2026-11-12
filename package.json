@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:worker-access": "node --test tests/worker-access.test.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@next/third-parties": "^16.3.4",

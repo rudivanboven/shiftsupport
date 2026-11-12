@@ -34,7 +34,7 @@ export default async function AvailableShiftsPage({
         <PageHeader
           eyebrow="Open shifts"
           title="Available shifts"
-          description="Shift opportunities from local retailers, open to members."
+          description="Shift opportunities from local retailers, open to workers with access."
         />
         <MembershipLock membership={membership} />
       </>

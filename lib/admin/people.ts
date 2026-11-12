@@ -33,6 +33,9 @@ export interface WorkerRow {
   membershipExpiresAt: string | null;
   cancelAtPeriodEnd: boolean;
   hasStripeSubscription: boolean;
+  /** The one-time signup fee, when paid (migration 0013). */
+  signupPaidAt: string | null;
+  signupFeeCents: number | null;
   applications: number;
   pendingApplications: number;
   hired: number;
@@ -65,6 +68,8 @@ export function workerRows(s: Snapshot): WorkerRow[] {
       membershipExpiresAt: worker.membership_expires_at,
       cancelAtPeriodEnd: Boolean(worker.membership_cancel_at_period_end),
       hasStripeSubscription: Boolean(worker.stripe_subscription_id),
+      signupPaidAt: worker.signup_paid_at,
+      signupFeeCents: worker.signup_fee_cents,
       applications: applications.length,
       pendingApplications: applications.filter((a) => a.status === "pending").length,
       hired: shifts.filter((sh) => sh.status !== "cancelled").length,
