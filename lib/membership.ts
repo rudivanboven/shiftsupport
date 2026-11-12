@@ -4,6 +4,8 @@ import { cache } from "react";
 
 import { formatMoney } from "@/lib/format";
 import { WORKER_SIGNUP_FEE } from "@/lib/pricing";
+import { isWorkerSignupFreeMode } from "@/lib/signup-checkout";
+import { workerHasAccessInMode } from "@/lib/worker-access";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -12,7 +14,9 @@ import { createClient } from "@/lib/supabase/server";
  * The browser never gets a say in this: the columns below are written only by
  * the Stripe webhook (and the server-side reconciliation that re-reads a
  * session from Stripe), and the database enforces the same rule again in the
- * INSERT policy on `shift_applications` — see migration 0007.
+ * INSERT policy on `shift_applications` — see migration 0007. Temporary free
+ * mode uses a server-only override and migration 0015's restricted RPC,
+ * without changing this record.
  */
 
 export type MembershipStatus = "inactive" | "active" | "past_due" | "canceled";
@@ -64,6 +68,7 @@ export function grantsAccess(
  * request, the same way the session helpers do.
  */
 export const getMembership = cache(async (workerId: string): Promise<Membership> => {
+  const freeMode = isWorkerSignupFreeMode();
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -79,10 +84,10 @@ export const getMembership = cache(async (workerId: string): Promise<Membership>
     // Fail closed — an unverifiable membership is not an active one — but say
     // so in the log rather than pretending the worker was refused.
     console.error("[membership] Could not read membership state:", error.message);
-    return { ...INACTIVE, unavailable: true };
+    return { ...INACTIVE, active: freeMode, unavailable: true };
   }
 
-  if (!data) return INACTIVE;
+  if (!data) return { ...INACTIVE, active: freeMode };
 
   const row = data as {
     membership_status: MembershipStatus | null;
@@ -123,7 +128,13 @@ export const getMembership = cache(async (workerId: string): Promise<Membership>
     startedAt: row.membership_started_at,
     expiresAt: row.membership_expires_at,
     cancelAtPeriodEnd: Boolean(row.membership_cancel_at_period_end),
-    active: grantsAccess(status, row.membership_expires_at),
+    // Free mode is a temporary access override only; never write it into the
+    // worker row. Paid mode returns to the stored Stripe/grandfathered state.
+    active: workerHasAccessInMode(
+      freeMode ? "free" : "paid",
+      status,
+      row.membership_expires_at,
+    ),
     signupPaidAt,
     signupFeeCents,
   };
@@ -135,6 +146,14 @@ export function membershipNotice(membership: Membership): {
   text: string;
   cta: string;
 } {
+  if (isWorkerSignupFreeMode()) {
+    return {
+      title: "Worker access is temporarily free",
+      text: "You can browse available shifts and apply without a membership payment while free access is enabled.",
+      cta: "View pricing and payments",
+    };
+  }
+
   switch (membership.status) {
     case "past_due":
       return {

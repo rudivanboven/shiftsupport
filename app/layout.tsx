@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import PublicPageMotion from "@/components/motion/PublicPageMotion";
 import "./globals.css";
 
-/* Headings + UI text — Montserrat (variable font).
+/* Headings + UI text — self-hosted Montserrat variable font (Latin subset).
+   See public/fonts/Montserrat-OFL.txt for the font license.
    Body copy uses Arial, a system font, so it needs no loading. */
-const montserrat = Montserrat({
-  subsets: ["latin"],
+const montserrat = localFont({
+  src: "../public/fonts/Montserrat-latin.woff2",
   variable: "--font-montserrat",
+  weight: "100 900",
   display: "swap",
 });
 

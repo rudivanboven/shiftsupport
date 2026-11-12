@@ -22,7 +22,8 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=...
 STRIPE_SECRET_KEY=...              # server-only, never NEXT_PUBLIC_
 STRIPE_WORKER_MEMBERSHIP_PRICE_ID=...
 STRIPE_WEBHOOK_SECRET=...
-WORKER_SIGNUP_CHECKOUT_ENABLED=true   # optional; worker signup checkout is OFF unless exactly "true"
+WORKER_SIGNUP_MODE=free             # free (default) or paid; server-only
+WORKER_SIGNUP_CHECKOUT_ENABLED=true # required along with paid mode to offer worker Checkout
 ```
 
 Payments (worker membership + retailer shift checkout) are documented in

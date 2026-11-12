@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getMembership } from "@/lib/membership";
+import { isWorkerSignupFreeMode } from "@/lib/signup-checkout";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type Result<T = undefined> =
@@ -35,9 +37,11 @@ export async function applyForShift(shiftId: string): Promise<Result> {
 
   if (!worker) return fail("We couldn't find your worker profile.");
 
-  // Membership is checked here for a clear message, and again by the database:
-  // the INSERT policy on shift_applications calls worker_membership_active(),
-  // so a request that skips this action is refused too.
+  // Membership is checked here for a clear message. Paid mode also gets the
+  // database INSERT policy check; free mode uses the restricted RPC below,
+  // which keeps the shift eligibility checks transactional without changing
+  // persisted membership state.
+  const freeMode = isWorkerSignupFreeMode();
   const membership = await getMembership(worker.id as string);
   if (!membership.active) {
     return fail(
@@ -58,11 +62,22 @@ export async function applyForShift(shiftId: string): Promise<Result> {
     return fail("This shift isn't live yet.");
   }
 
-  const { error } = await supabase.from("shift_applications").insert({
+  const application = {
     shift_id: shiftId,
     worker_id: worker.id,
     status: "pending",
-  });
+  };
+
+  // The existing table policy checks persisted membership. During temporary
+  // free mode, the server has already authenticated the worker and applied
+  // the same open/paid-shift checks above, so use the service role for this
+  // one atomic RPC without rewriting membership rows or weakening database RLS.
+  const { error } = freeMode
+    ? await createAdminClient().rpc("apply_for_shift_free_mode", {
+        p_worker_id: worker.id,
+        p_shift_id: shiftId,
+      })
+    : await supabase.from("shift_applications").insert(application);
 
   if (error) {
     if (error.code === "23505") return fail("You've already applied for this shift.");

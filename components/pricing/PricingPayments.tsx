@@ -20,7 +20,7 @@ import {
   WORKER_SIGNUP_FEE,
   priceShift,
 } from "@/lib/pricing";
-import { isWorkerSignupCheckoutEnabled } from "@/lib/signup-checkout";
+import { isWorkerSignupCheckoutEnabled, isWorkerSignupFreeMode } from "@/lib/signup-checkout";
 import styles from "./PricingPayments.module.css";
 
 /**
@@ -38,17 +38,16 @@ import styles from "./PricingPayments.module.css";
 const EXAMPLE_HOURS = 5;
 const example = priceShift(EXAMPLE_HOURS);
 
-const WORKER_FLOW = [
-  [
-    "Join",
-    `A one-time ${formatMoney(WORKER_SIGNUP_FEE)} signup fee activates your membership — that is what opens up shift opportunities.`,
-  ],
+const workerFlow = (freeMode: boolean) => [
+  ["Join", freeMode
+    ? "Create your worker account and access eligible shift opportunities without a membership payment while free access is enabled."
+    : `Pay a one-time ${formatMoney(WORKER_SIGNUP_FEE)} signup fee to activate membership and open shift access.`],
   ["Access shifts", "Browse the shifts you are eligible for from Available Shifts."],
   ["Apply", "Apply to the shifts that fit your schedule."],
   ["Get hired", "The retailer reviews applicants and confirms who they want."],
   ["Complete the shift", "Work the shift and confirm it once it is done."],
   ["Shift record", "Your completed shift keeps a record of the hours and gross pay."],
-] as const;
+  ] as const;
 
 const RETAILER_FLOW = [
   ["Create a shift", "Set the date, hours, location and tasks in Post a Shift."],
@@ -146,15 +145,19 @@ function BreakdownRow({
 function MembershipPanel({
   membership,
   checkout,
+  freeMode,
 }: {
   membership: Membership;
   checkout?: "success" | "canceled" | null;
+  freeMode: boolean;
 }) {
   // A just-returned checkout that the database has not confirmed yet. The URL
   // is only a hint that something may have happened — never a confirmation.
-  const confirming = checkout === "success" && !membership.active;
+  const confirming = !freeMode && checkout === "success" && !membership.active;
 
-  const tone = membership.active
+  const tone = freeMode
+    ? "approved"
+    : membership.active
     ? membership.status === "past_due"
       ? "pending"
       : "approved"
@@ -162,7 +165,9 @@ function MembershipPanel({
       ? "pending"
       : "neutral";
 
-  const label = confirming
+  const label = freeMode
+    ? "Free access"
+    : confirming
     ? "Confirming…"
     : membership.active
       ? membership.status === "past_due"
@@ -179,7 +184,7 @@ function MembershipPanel({
   const expiryLabel = "Access until";
 
   const paidSignup = membership.signupPaidAt
-    ? `${formatMoney((membership.signupFeeCents ?? WORKER_SIGNUP_FEE * 100) / 100)} one-time signup fee · paid ${formatDate(membership.signupPaidAt)}`
+    ? `${freeMode ? "Previously paid " : ""}${formatMoney((membership.signupFeeCents ?? WORKER_SIGNUP_FEE * 100) / 100)} one-time signup fee · paid ${formatDate(membership.signupPaidAt)}`
     : null;
 
   // A membership started under the old yearly plan, still on its Stripe
@@ -188,17 +193,25 @@ function MembershipPanel({
 
   const billingLabel = paidSignup
     ? paidSignup
-    : membership.cancelAtPeriodEnd
-      ? "Cancels at period end"
-      : membership.status === "past_due"
-        ? "Payment due — update your card below"
-        : membership.active
-          ? legacySubscription
-            ? "Existing yearly membership — renews automatically unless cancelled below"
-            : "Complimentary · no charge"
-          : legacySubscription
-            ? "Existing yearly membership — manage it below"
-            : `${formatMoney(WORKER_SIGNUP_FEE)} one-time signup fee`;
+    : freeMode
+      ? legacySubscription
+        ? membership.status === "past_due"
+          ? "Existing yearly subscription needs attention; free access remains enabled temporarily"
+          : membership.cancelAtPeriodEnd
+            ? "Existing yearly subscription remains scheduled to cancel; free access is temporary"
+            : "Existing yearly subscription remains managed in Stripe; free access is temporary"
+        : "No membership payment required while free access is enabled"
+      : membership.cancelAtPeriodEnd
+        ? "Cancels at period end"
+        : membership.status === "past_due"
+          ? "Payment due — update your card below"
+          : membership.active
+            ? legacySubscription
+              ? "Existing yearly membership — renews automatically unless cancelled below"
+              : "Complimentary · no charge"
+            : legacySubscription
+              ? "Existing yearly membership — manage it below"
+              : `${formatMoney(WORKER_SIGNUP_FEE)} one-time signup fee`;
 
   // The one-time Checkout is only for a worker with no access and no yearly
   // subscription still in play. A past-due or lapsed legacy subscriber goes
@@ -211,7 +224,9 @@ function MembershipPanel({
   return (
     <Panel
       title="Your membership"
-      description="Membership state comes from Stripe — it updates here as soon as a payment is confirmed."
+      description={freeMode
+        ? "Worker access is temporarily free. Existing membership and payment records are preserved."
+        : "Membership state comes from Stripe — it updates here as soon as a payment is confirmed."}
     >
       <div className={styles.membership}>
         <div className={styles.membershipState}>
@@ -225,22 +240,24 @@ function MembershipPanel({
               </p>
               <ConfirmingPoller />
             </>
-          ) : checkout === "canceled" ? (
+          ) : checkout === "canceled" && !freeMode ? (
             <p className={styles.membershipNote}>
               Checkout was cancelled, so no membership was started and nothing was
               charged. You can start it again whenever you are ready.
             </p>
           ) : membership.active ? (
             <p className={styles.membershipNote}>
-              {membership.status === "past_due"
+              {freeMode
+                ? "Worker access is temporarily free. Any existing subscription remains available to manage below."
+                : membership.status === "past_due"
                 ? "Stripe could not take your latest payment. Update your card to keep your access."
                 : "Your membership is active, so eligible shift opportunities are open to you."}
             </p>
           ) : (
             <p className={styles.membershipNote}>
-              Activate your membership to access eligible shift opportunities and apply
-              for local shifts. It is a one-time {formatMoney(WORKER_SIGNUP_FEE)} signup
-              fee — there is no yearly membership fee.
+              {freeMode
+                ? "Worker access is temporarily free. You can browse available shifts and apply without paying a membership fee."
+                : `Activate your membership to access eligible shift opportunities and apply for local shifts. It is a one-time ${formatMoney(WORKER_SIGNUP_FEE)} signup fee — there is no yearly membership fee.`}
             </p>
           )}
         </div>
@@ -253,7 +270,9 @@ function MembershipPanel({
           <div>
             <dt>{expiryLabel}</dt>
             <dd>
-              {membership.expiresAt
+              {freeMode
+                ? "While free access is enabled"
+                : membership.expiresAt
                 ? formatDate(membership.expiresAt)
                 : membership.active
                   ? "No expiry"
@@ -299,6 +318,7 @@ export default function PricingPayments({
   checkout?: "success" | "canceled" | null;
 }) {
   const isWorker = role === "worker";
+  const freeMode = isWorker && isWorkerSignupFreeMode();
 
   return (
     <>
@@ -307,7 +327,9 @@ export default function PricingPayments({
         title={isWorker ? "Your membership and pay" : "Your shift costs, explained"}
         description={
           isWorker
-            ? "Everything a ShiftSupport worker pays for, and everything a completed shift pays out. These details are only shown to signed-in members."
+            ? freeMode
+              ? "Worker membership access is temporarily free. Review your shift pay and any historical payment records here."
+              : "Everything a ShiftSupport worker pays for, and everything a completed shift pays out. These details are only shown to signed-in members."
             : "What a ShiftSupport shift costs and how that cost is calculated. These details are only shown to signed-in retailers."
         }
       />
@@ -316,22 +338,28 @@ export default function PricingPayments({
         {isWorker ? (
           <>
             {membership ? (
-              <MembershipPanel membership={membership} checkout={checkout} />
+              <MembershipPanel membership={membership} checkout={checkout} freeMode={freeMode} />
             ) : null}
 
             <section className={styles.cardGrid}>
               <PriceCard
                 tone="dark"
                 icon={<IconUser width={18} height={18} />}
-                eyebrow="Worker signup fee"
-                amount={formatMoney(WORKER_SIGNUP_FEE)}
-                unit="one-time"
-                title="Pay once to join ShiftSupport"
-                points={[
-                  `A ${formatMoney(WORKER_SIGNUP_FEE)} one-time signup fee — no recurring signup fee.`,
-                  "An active membership provides access to eligible shift opportunities.",
-                  "There is no yearly membership fee to renew.",
-                ]}
+                eyebrow={freeMode ? "Worker access" : "Worker signup fee"}
+                amount={freeMode ? "Free" : formatMoney(WORKER_SIGNUP_FEE)}
+                unit={freeMode ? "temporarily" : "one-time"}
+                title={freeMode ? "Free access to ShiftSupport" : "Pay once to join ShiftSupport"}
+                points={freeMode
+                  ? [
+                      "No membership payment is required while free access is enabled.",
+                      "Browse eligible shifts and apply for local work.",
+                      "Existing membership and payment records are preserved.",
+                    ]
+                  : [
+                      `A ${formatMoney(WORKER_SIGNUP_FEE)} one-time signup fee — no recurring signup fee.`,
+                      "An active membership provides access to eligible shift opportunities.",
+                      "There is no yearly membership fee to renew.",
+                    ]}
               />
               <PriceCard
                 icon={<IconCash width={18} height={18} />}
@@ -350,7 +378,7 @@ export default function PricingPayments({
               title="How it works, start to finish"
               description="From an active membership through to the record of a completed shift."
             >
-              <FlowSteps steps={WORKER_FLOW} />
+              <FlowSteps steps={workerFlow(freeMode)} />
             </Panel>
           </>
         ) : (

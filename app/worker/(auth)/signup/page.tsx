@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { redirectIfSignedIn } from "@/lib/auth/session";
 import WorkerSignupForm from "./SignupForm";
+import { isWorkerSignupFreeMode } from "@/lib/signup-checkout";
 
 export const metadata: Metadata = {
   title: "Create a worker account | ShiftSupport",
@@ -17,13 +18,17 @@ export default async function WorkerSignupPage() {
       asideTitle="Real shifts. Real pay. On your schedule."
       asideText="Sign up once, then browse short retail shifts posted by local stores. Apply to the ones that suit you and get an answer fast."
       points={[
-        "Pay once to join — a $1 one-time signup fee, no yearly membership fee",
+        isWorkerSignupFreeMode()
+          ? "Free access to shifts while temporary free worker access is enabled"
+          : "A one-time $1 worker signup fee opens shift access",
         "Apply to a shift in a single tap",
         "Store contact details as soon as you're hired",
       ]}
       eyebrow="Worker sign up"
       title="Create your account"
-      subtitle="It takes about a minute. You'll be browsing open shifts straight after."
+      subtitle={isWorkerSignupFreeMode()
+        ? "It takes about a minute. You can browse and apply for shifts without a membership payment while free access is enabled."
+        : "It takes about a minute. Membership payment is required before you can browse and apply for shifts."}
       footer={
         <>
           Already have an account? <a href="/worker/login">Log in</a>

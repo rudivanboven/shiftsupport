@@ -1,4 +1,10 @@
 import "server-only";
+import { resolveWorkerSignupMode, workerCheckoutEnabled } from "@/lib/worker-access";
+
+/** Temporary operating mode: defaults to free and is controlled server-side. */
+export function isWorkerSignupFreeMode(): boolean {
+  return resolveWorkerSignupMode(process.env.WORKER_SIGNUP_MODE) === "free";
+}
 
 /**
  * The worker signup Checkout kill-switch.
@@ -25,7 +31,8 @@ import "server-only";
  * with a live key keeps the button off and says why in the server log.
  */
 export function isWorkerSignupCheckoutEnabled(): boolean {
-  if (process.env.WORKER_SIGNUP_CHECKOUT_ENABLED?.trim() !== "true") return false;
+  const mode = resolveWorkerSignupMode(process.env.WORKER_SIGNUP_MODE);
+  if (!workerCheckoutEnabled(mode, process.env.WORKER_SIGNUP_CHECKOUT_ENABLED)) return false;
 
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
   if (secretKey.startsWith("sk_live_") && process.env.VERCEL_ENV !== "production") {

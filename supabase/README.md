@@ -218,3 +218,13 @@ gain marketplace access without paying. No data is modified; idempotent.
 | `workers_enforce_membership_state` | New `before insert or update` trigger: for the `authenticated` / `anon` roles it pins `stripe_customer_id`, `stripe_subscription_id` and every `membership_*` column to the existing row (or to "no membership" on insert). The service role, the SQL editor and SECURITY DEFINER functions pass through, so Stripe fulfillment, `ensureCustomer`, signup provisioning and operator SQL are unchanged. |
 | RLS | Untouched. Policies still decide which rows a worker may update; this migration decides which columns. |
 | Verification | `supabase/verification/0014_verify_membership_protection.sql` impersonates a real worker inside a transaction, attempts the tampering, confirms profile editing still works, proves the trigger holds even with a widened grant, and ends in `ROLLBACK`. |
+
+## What 0015 does
+
+`0015_apply_for_shift_free_mode.sql` adds the database-side insert path used
+only while `WORKER_SIGNUP_MODE=free`. Existing application RLS remains intact
+for paid mode. The function is executable only by `service_role`, locks the
+shift row, and rechecks that the shift is open, unfilled, and paid before it
+inserts an application. It does not change membership or payment data. Apply
+it after 0001 and 0007 before enabling free mode in an environment; do not
+apply it as part of the temporary code-only workflow without the usual review.

@@ -12,13 +12,13 @@ publication happen only from Stripe-verified state — the signed webhook, or a
 server-side re-read of the Checkout session. A redirect back to a success URL
 proves nothing and is never treated as proof.
 
-> **Status (2026-10-20): implemented, not yet switched on.** The worker price
-> changed from an $18/year subscription to a **$1 one-time signup fee**. The
-> code below is the new flow; the Checkout button stays withheld until the
-> `WORKER_SIGNUP_CHECKOUT_ENABLED` environment variable is set to `true` (see
-> §1), and `startMembershipCheckout` refuses to open a session while it is
-> off. Production stays off until that variable is added in Vercel. See §5 for
-> the remaining steps.
+> **Current mode: temporary free worker access.** Set `WORKER_SIGNUP_MODE=free`
+> (the default) to allow all workers to browse and apply without a membership
+> payment. This is a computed access override: it does not change membership,
+> Stripe, subscription, or payment-history records. To restore the one-time
+> signup payment flow, set `WORKER_SIGNUP_MODE=paid` and
+> `WORKER_SIGNUP_CHECKOUT_ENABLED=true`; existing Stripe Checkout and webhook
+> code remains in place.
 
 ## 1. Environment
 
@@ -28,7 +28,15 @@ STRIPE_SECRET_KEY=sk_test_...              # server only, never NEXT_PUBLIC_
 STRIPE_WORKER_MEMBERSHIP_PRICE_ID=price_...  # a ONE-TIME $1 price (not recurring)
 STRIPE_WEBHOOK_SECRET=whsec_...            # from the endpoint or `stripe listen`
 WORKER_SIGNUP_CHECKOUT_ENABLED=true        # kill-switch; anything but exactly "true" = off
+WORKER_SIGNUP_MODE=free                    # free (default) or paid; server-only
 ```
+
+Free mode overrides worker marketplace access without writing membership
+columns. New accounts keep the database's inactive default; inactive and
+expired workers receive access only while free mode is selected. Switching
+back to paid mode restores access from the existing membership data. A worker
+who signed up during free mode therefore follows the normal $1 Checkout flow
+when paid mode is restored, unless they already have valid membership data.
 
 The price must be a **one-time** price. Checkout runs in `payment` mode, and
 Stripe rejects a recurring price there, so a stale recurring id fails loudly
@@ -66,6 +74,9 @@ Run, in order, in the Supabase dashboard → SQL Editor:
    service role (see the note under §4). Then run
    `supabase/verification/0014_verify_membership_protection.sql`, which
    ends in `ROLLBACK` and prints PASS lines.
+5. `supabase/migrations/0015_apply_for_shift_free_mode.sql` — adds the
+   service-role-only, atomic application path used while worker access is
+   free. Existing paid-mode application RLS remains unchanged.
 
 ### How a one-time payer is stored
 
