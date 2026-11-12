@@ -19,7 +19,7 @@ export default async function WorkerSignupPage() {
       asideText="Sign up once, then browse short retail shifts posted by local stores. Apply to the ones that suit you and get an answer fast."
       points={[
         isWorkerSignupFreeMode()
-          ? "Free access to shifts while temporary free worker access is enabled"
+          ? "Free to join — no membership fee while temporary free access is enabled"
           : "A one-time $1 worker signup fee opens shift access",
         "Apply to a shift in a single tap",
         "Store contact details as soon as you're hired",
