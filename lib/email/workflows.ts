@@ -752,36 +752,13 @@ export interface RetailerReminderJobSummary {
   errors: { storeId: string; error: string }[];
 }
 
-/**
- * Computes when the next 14-day reminder is due for a retailer candidate:
- *   - Step 1 (first reminder): 14 days after `registeredAt`.
- *   - Step 2+ (subsequent reminders): 14 days after `lastReminderSentAt` (or `nextReminderDueAt`).
- */
+/** The persisted next_reminder_due_at is authoritative for every reminder. */
 export function computeNextReminderDueMs(candidate: {
-  registeredAt: string;
-  remindersSentCount: number;
-  lastReminderSentAt: string | null;
   nextReminderDueAt: string | null;
 }): number {
-  const registeredMs = Date.parse(candidate.registeredAt);
-  const lastSentMs = candidate.lastReminderSentAt
-    ? Date.parse(candidate.lastReminderSentAt)
-    : Number.NaN;
-  const explicitNextMs = candidate.nextReminderDueAt
+  return candidate.nextReminderDueAt
     ? Date.parse(candidate.nextReminderDueAt)
     : Number.NaN;
-
-  const anchorMs =
-    candidate.remindersSentCount > 0 && Number.isFinite(lastSentMs)
-      ? lastSentMs
-      : registeredMs;
-
-  const intervalDueMs = anchorMs + RETAILER_REMINDER_INTERVAL_MS;
-
-  if (Number.isFinite(explicitNextMs)) {
-    return Math.max(intervalDueMs, explicitNextMs);
-  }
-  return intervalDueMs;
 }
 
 /**
@@ -850,7 +827,9 @@ export async function executeRetailerReminderJob(
     }
 
     // 4. Check 14-day interval eligibility.
-    const dueMs = computeNextReminderDueMs(candidate);
+    const dueMs = computeNextReminderDueMs({
+      nextReminderDueAt: candidate.nextReminderDueAt,
+    });
     if (!Number.isFinite(dueMs) || nowMs < dueMs) {
       summary.notDue += 1;
       continue;
@@ -998,6 +977,11 @@ export interface InMemoryUserSeed {
   storeId?: string | null;
   storeName?: string | null;
   registeredAt?: string;
+  remindersSentCount?: number;
+  lastReminderSentAt?: string | null;
+  nextReminderDueAt?: string;
+  firstShiftPostedAt?: string | null;
+  stoppedAt?: string | null;
 }
 
 export function createInMemoryWorkflowRepository(
@@ -1048,13 +1032,13 @@ export function createInMemoryWorkflowRepository(
           storeId: seed.storeId,
           userId: seed.userId,
           registeredAt,
-          remindersSentCount: 0,
-          lastReminderSentAt: null,
-          nextReminderDueAt: new Date(
-            regMs + RETAILER_REMINDER_INTERVAL_MS,
-          ).toISOString(),
-          firstShiftPostedAt: null,
-          stoppedAt: null,
+          remindersSentCount: seed.remindersSentCount ?? 0,
+          lastReminderSentAt: seed.lastReminderSentAt ?? null,
+          nextReminderDueAt:
+            seed.nextReminderDueAt ??
+            new Date(regMs + RETAILER_REMINDER_INTERVAL_MS).toISOString(),
+          firstShiftPostedAt: seed.firstShiftPostedAt ?? null,
+          stoppedAt: seed.stoppedAt ?? null,
           stoppedReason: null,
           lastError: null,
           lastAttemptAt: null,

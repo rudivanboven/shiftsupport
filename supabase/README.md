@@ -10,7 +10,7 @@ column is removed, and re-running them is safe.
    project → **SQL Editor** → **New query**.
 2. Paste the whole of `migrations/0001_supabase_auth_architecture.sql`, run it.
 3. Paste the whole of `migrations/0002_hire_and_reject_rpc.sql`, run it.
-4. Then `0003` through `0016` in order, the same way.
+4. Then `0003` through `0017` in order, the same way.
 
 (Or, with the CLI linked to this project: `supabase db push`.)
 
@@ -32,6 +32,13 @@ unchanged.
 For a database where 0013–0015 are confirmed present but 0016 objects are
 absent, review and apply only `migrations/0016_automated_email_workflows.sql`.
 Do not apply a second welcome-email ledger migration.
+
+Migration 0017 performs the one-time reminder rollout reset. It sets
+`next_reminder_due_at` to 14 days after the migration transaction starts for
+each schedule that has neither a first shift nor a stopped timestamp. It
+preserves `registered_at`, sent count and last-sent history. A marker row
+prevents the reset from running again if the file is rerun. Apply 0017 after
+0016; it does not send emails.
 
 ## What 0001 does
 

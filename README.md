@@ -106,6 +106,9 @@ Apply it after migrations 0013–0015. The Vercel Cron job calls
 whose 14-day due time has arrived and stops stores with a posted shift. Set
 `CRON_SECRET` in Vercel to protect the route. Reminder sending remains disabled
 unless `RETAILER_REMINDERS_ENABLED=true`; welcome emails are unaffected.
+Migration 0017 resets eligible existing retailer reminder due dates to 14 days
+after its one-time rollout timestamp, so existing accounts do not receive
+overdue catch-up reminders.
 
 In Supabase Dashboard → Authentication → URL Configuration, set the production
 Site URL to the public ShiftSupport origin and allow the exact production

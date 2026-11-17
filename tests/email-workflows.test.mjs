@@ -77,7 +77,6 @@ test("1. New Worker signup -> receives one Worker Welcome Email (and never dupli
   assert.equal(first.ok, true);
   assert.equal(first.status, "sent");
   assert.equal(mail.sentMessages.length, 1);
-
   const msg = mail.sentMessages[0];
   assert.equal(msg.to, "alex@worker.test");
   assert.equal(msg.subject, "Welcome to ShiftSupport!");
@@ -147,6 +146,10 @@ test("2. New Retailer signup -> receives one Retailer Welcome Email (and never d
   assert.equal(first.ok, true);
   assert.equal(first.status, "sent");
   assert.equal(mail.sentMessages.length, 1);
+  assert.equal(
+    store.getSchedule("store-1")?.nextReminderDueAt,
+    new Date(BASE_TIME + RETAILER_REMINDER_INTERVAL_MS).toISOString(),
+  );
 
   const msg = mail.sentMessages[0];
   assert.equal(msg.to, "sam@verhoeven.test");
@@ -319,6 +322,61 @@ test("5 & 6. Retailer receives first reminder after 14 days and subsequent remin
   );
   assert.equal(thirdRun.sent, 1);
   assert.equal(mail.sentMessages.length, 3);
+});
+
+test("Existing retailer rollout reset preserves history and prevents catch-up sends", async () => {
+  const rollout = new Date("2026-11-18T12:00:00.000Z");
+  const newDue = new Date(rollout.getTime() + RETAILER_REMINDER_INTERVAL_MS).toISOString();
+  const legacy = [
+    { registeredAt: "2026-01-01T00:00:00.000Z", nextReminderDueAt: "2026-02-01T00:00:00.000Z", remindersSentCount: 0, lastReminderSentAt: null, firstShiftPostedAt: null, stoppedAt: null },
+    { registeredAt: "2026-11-01T00:00:00.000Z", nextReminderDueAt: "2026-11-25T00:00:00.000Z", remindersSentCount: 2, lastReminderSentAt: "2026-11-11T00:00:00.000Z", firstShiftPostedAt: null, stoppedAt: null },
+    { registeredAt: "2026-01-01T00:00:00.000Z", nextReminderDueAt: "2026-02-01T00:00:00.000Z", remindersSentCount: 1, lastReminderSentAt: "2026-01-15T00:00:00.000Z", firstShiftPostedAt: "2026-02-01T00:00:00.000Z", stoppedAt: "2026-02-01T00:00:00.000Z" },
+    { registeredAt: "2026-01-01T00:00:00.000Z", nextReminderDueAt: "2026-02-01T00:00:00.000Z", remindersSentCount: 1, lastReminderSentAt: "2026-01-15T00:00:00.000Z", firstShiftPostedAt: null, stoppedAt: "2026-02-01T00:00:00.000Z" },
+  ];
+  const reset = legacy.map((schedule) =>
+    schedule.firstShiftPostedAt === null && schedule.stoppedAt === null
+      ? { ...schedule, nextReminderDueAt: newDue }
+      : { ...schedule },
+  );
+
+  // Old overdue and near-future due dates both move to rollout + 14 days.
+  assert.equal(reset[0].nextReminderDueAt, newDue);
+  assert.equal(reset[1].nextReminderDueAt, newDue);
+  // Signup/reminder history stays intact; posted/stopped schedules are untouched.
+  assert.equal(reset[1].registeredAt, legacy[1].registeredAt);
+  assert.equal(reset[1].remindersSentCount, 2);
+  assert.equal(reset[1].lastReminderSentAt, legacy[1].lastReminderSentAt);
+  assert.equal(reset[2].nextReminderDueAt, legacy[2].nextReminderDueAt);
+  assert.equal(reset[3].nextReminderDueAt, legacy[3].nextReminderDueAt);
+
+  const store = createInMemoryWorkflowRepository([
+    {
+      userId: "legacy-retailer",
+      storeId: "legacy-store",
+      role: "retailer",
+      email: "legacy@store.test",
+      fullName: "Legacy Retailer",
+      registeredAt: legacy[0].registeredAt,
+      nextReminderDueAt: newDue,
+    },
+  ]);
+  const mail = createMockEmailEnvironment();
+  const deps = { repo: store.repo, getEmailProvider: mail.getEmailProvider };
+
+  const beforeNewDue = await executeRetailerReminderJob(
+    { now: new Date(rollout.getTime() + RETAILER_REMINDER_INTERVAL_MS - 1), siteUrl: "https://shiftsupport.app" },
+    deps,
+  );
+  assert.equal(beforeNewDue.sent, 0);
+  assert.equal(beforeNewDue.notDue, 1);
+  assert.equal(mail.sentMessages.length, 0);
+
+  const atNewDue = await executeRetailerReminderJob(
+    { now: new Date(newDue), siteUrl: "https://shiftsupport.app" },
+    deps,
+  );
+  assert.equal(atNewDue.sent, 1);
+  assert.equal(mail.sentMessages.length, 1);
 });
 
 test("7. Retailer posts their first shift -> all future reminders stop immediately", async () => {
@@ -526,7 +584,7 @@ test("11. Resend adapter sends HTML, plain-text, and Idempotency-Key header corr
 });
 
 test("12. Source integration: auth signup, shift creation, cron route, and SQL migration guards", async () => {
-  const [authAction, shiftsAction, cronRoute, vercelConfig, migrationSql, serverCode] =
+  const [authAction, shiftsAction, cronRoute, vercelConfig, migrationSql, rolloutMigration, serverCode] =
     await Promise.all([
       readFile(new URL("../app/actions/auth.ts", import.meta.url), "utf8"),
       readFile(new URL("../app/actions/shifts.ts", import.meta.url), "utf8"),
@@ -543,6 +601,10 @@ test("12. Source integration: auth signup, shift creation, cron route, and SQL m
           "../supabase/migrations/0016_automated_email_workflows.sql",
           import.meta.url,
         ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../supabase/migrations/0017_reset_retailer_reminder_rollout.sql", import.meta.url),
         "utf8",
       ),
       readFile(new URL("../lib/email/server.ts", import.meta.url), "utf8"),
@@ -583,6 +645,11 @@ test("12. Source integration: auth signup, shift creation, cron route, and SQL m
   assert.match(migrationSql, /and su_inner\.role = 'owner'/i);
   assert.match(serverCode, /RETAILER_REMINDERS_ENABLED\?\.trim\(\)\.toLowerCase\(\) !== "true"/);
   assert.doesNotMatch(serverCode, /select\("id,store_id,auth_user_id,email,role,created_at"\)/);
+  assert.match(rolloutMigration, /v_rollout_timestamp \+ interval '14 days'/i);
+  assert.match(rolloutMigration, /first_shift_posted_at is null\s+and stopped_at is null/i);
+  assert.match(rolloutMigration, /on conflict \(marker\) do nothing/i);
+  assert.match(rolloutMigration, /set next_reminder_due_at =/i);
+  assert.doesNotMatch(rolloutMigration, /set\s+(registered_at|reminders_sent_count|last_reminder_sent_at)\s*=/i);
   assert.match(
     migrationSql,
     /alter table public\.email_workflow_deliveries enable row level security/i,
