@@ -136,14 +136,10 @@ audit trail do not need to change.
 
 ## 6. Email
 
-The app has no transactional email provider (Supabase Auth only sends its own
-auth emails). None was invented. `lib/email/` defines the `EmailProvider`
-contract with an **empty** registry, so the composer validates the message,
-records the attempt in `admin_communications` and the audit log, and offers to
-hand the message to the admin's own mail client instead.
-
-To enable server-side sending: write an adapter in `lib/email/providers/`,
-register it in `PROVIDERS`, and set the environment variables below.
+Supabase Auth sends authentication messages. Application messages, including
+the Operations Control Center composer and signup welcome emails, use the
+server-side Resend adapter in `lib/email/`. The composer still supports a
+mail-client handoff when the provider is not configured.
 
 ## 7. Environment variables
 
@@ -156,6 +152,9 @@ All optional — the console works without them.
 | `ADMIN_EMAIL_PROVIDER` | — | Id of a registered email adapter. Without it, sending reports "not configured". |
 | `ADMIN_EMAIL_FROM` | — | Verified sender address for admin email. |
 | *(provider API key)* | — | Whatever the chosen email adapter needs. Server-side only, never `NEXT_PUBLIC_`. |
+| `EMAIL_PROVIDER` | — | Application email provider (`resend`). |
+| `EMAIL_FROM` | — | Verified Resend sender, such as `ShiftSupport <noreply@shiftsupport.net>`. |
+| `RESEND_API_KEY` | — | Server-only Resend API key. |
 | `PAYROLL_PROVIDER` | `manual_csv` | Id of a registered payroll adapter. No ADP adapter exists yet. |
 
 ## 8. Routes

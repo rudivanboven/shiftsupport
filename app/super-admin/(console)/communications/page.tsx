@@ -91,9 +91,8 @@ export default async function CommunicationsPage({
           </p>
           <p>
             The composer still works: it validates the message, records the attempt, and offers to open it in your own mail
-            app. To send from the server, add an adapter in <code>lib/email/</code> and set <code>ADMIN_EMAIL_PROVIDER</code>{" "}
-            and <code>ADMIN_EMAIL_FROM</code> (plus that provider&apos;s API key) as server-side environment variables. No
-            provider or credential is assumed here.
+            app. To send from the server, set <code>EMAIL_PROVIDER=resend</code>, <code>EMAIL_FROM</code>, and the server-only{" "}
+            <code>RESEND_API_KEY</code> environment variable.
           </p>
         </Notice>
       )}

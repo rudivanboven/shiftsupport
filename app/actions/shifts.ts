@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { markRetailerFirstShiftPosted } from "@/lib/email/server";
 import { priceShift, shiftWindow } from "@/lib/pricing";
 import {
   MAX_SERIES_WEEKS,
@@ -125,6 +126,8 @@ export async function createShift(
       values,
     };
   }
+
+  void markRetailerFirstShiftPosted(resolved.storeId);
 
   revalidatePath("/retailer/dashboard");
   revalidatePath("/retailer/shifts");
@@ -272,6 +275,8 @@ async function createRecurringShift(formData: FormData): Promise<FormState> {
       .eq("id", seriesId);
     return { error: "We couldn't create that recurring shift. Please try again.", values };
   }
+
+  void markRetailerFirstShiftPosted(resolved.storeId);
 
   revalidatePath("/retailer/dashboard");
   revalidatePath("/retailer/shifts");

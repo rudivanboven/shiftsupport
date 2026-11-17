@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendRetailerWelcomeEmail, sendWorkerWelcomeEmail } from "@/lib/email/server";
 import { getSiteUrl } from "@/lib/site";
 import {
   type FieldErrors,
@@ -98,6 +99,16 @@ async function provisionWorker(input: {
 }) {
   const admin = createAdminClient();
 
+  // Check the identity link first. This makes retries a no-op once the worker
+  // row exists and lets a login safely repair only genuinely missing rows.
+  const { data: existing, error: lookupError } = await admin
+    .from("workers")
+    .select("id")
+    .eq("auth_user_id", input.userId)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (existing) return;
+
   const { error: profileError } = await admin.from("profiles").upsert(
     {
       id: input.userId,
@@ -111,20 +122,22 @@ async function provisionWorker(input: {
   );
   if (profileError) throw profileError;
 
-  const { data: existing } = await admin
-    .from("workers")
-    .select("id")
-    .eq("auth_user_id", input.userId)
-    .maybeSingle();
-
-  if (!existing) {
-    const { error } = await admin.from("workers").insert({
-      auth_user_id: input.userId,
-      full_name: input.fullName,
-      email: input.email,
-      phone: input.phone,
-    });
-    if (error) throw error;
+  const { error: insertError } = await admin.from("workers").insert({
+    auth_user_id: input.userId,
+    full_name: input.fullName,
+    email: input.email,
+    phone: input.phone,
+  });
+  if (insertError) {
+    // Two retries can race between the lookup and insert. Accept only the
+    // unique-link winner; otherwise surface the actual insert failure.
+    const { data: racedRow, error: retryLookupError } = await admin
+      .from("workers")
+      .select("id")
+      .eq("auth_user_id", input.userId)
+      .maybeSingle();
+    if (retryLookupError) throw retryLookupError;
+    if (!racedRow) throw insertError;
   }
 
   await setRole(input.userId, "worker");
@@ -154,11 +167,14 @@ async function provisionRetailer(input: {
   );
   if (profileError) throw profileError;
 
-  const { data: existingLink } = await admin
+  const { data: existingLink, error: existingLinkError } = await admin
     .from("store_users")
     .select("id, store_id")
     .eq("auth_user_id", input.userId)
     .maybeSingle();
+  if (existingLinkError) throw existingLinkError;
+
+  let storeId = (existingLink?.store_id as string | undefined) ?? null;
 
   if (!existingLink) {
     const { data: store, error: storeError } = await admin
@@ -171,9 +187,10 @@ async function provisionRetailer(input: {
       .select("id")
       .single();
     if (storeError) throw storeError;
+    storeId = store!.id;
 
     const { error: linkError } = await admin.from("store_users").insert({
-      store_id: store!.id,
+      store_id: storeId,
       auth_user_id: input.userId,
       email: input.email,
       role: "owner",
@@ -182,6 +199,8 @@ async function provisionRetailer(input: {
   }
 
   await setRole(input.userId, "retailer");
+  if (!storeId) throw new Error("Retailer provisioning did not resolve a store.");
+  return { storeId };
 }
 
 /* ------------------------------------------------------------------ *
@@ -236,6 +255,15 @@ export async function signUpWorker(
   } catch (err) {
     console.error("[signUpWorker] provisioning failed", err);
     return { error: "We created your login but could not finish your profile. Please contact support.", values };
+  }
+
+  try {
+    const result = await sendWorkerWelcomeEmail({ userId: data.user.id, email, siteUrl });
+    if (result.status === "failed") {
+      console.error("[signUpWorker] welcome email failed", result.reason ?? "unknown error");
+    }
+  } catch (err) {
+    console.error("[signUpWorker] welcome email failed", err);
   }
 
   if (!data.session) redirect("/worker/login?confirm=1");
@@ -294,8 +322,9 @@ export async function signUpRetailer(
   }
   if (!data.user) return { error: GENERIC_ERROR, values };
 
+  let storeId: string;
   try {
-    await provisionRetailer({
+    const provisioned = await provisionRetailer({
       userId: data.user.id,
       email,
       fullName,
@@ -304,9 +333,24 @@ export async function signUpRetailer(
       storeAddress,
       storePhone,
     });
+    storeId = provisioned.storeId;
   } catch (err) {
     console.error("[signUpRetailer] provisioning failed", err);
     return { error: "We created your login but could not finish setting up your store. Please contact support.", values };
+  }
+
+  try {
+    const result = await sendRetailerWelcomeEmail({
+      userId: data.user.id,
+      email,
+      storeId,
+      siteUrl,
+    });
+    if (result.status === "failed") {
+      console.error("[signUpRetailer] welcome email failed", result.reason ?? "unknown error");
+    }
+  } catch (err) {
+    console.error("[signUpRetailer] welcome email failed", err);
   }
 
   if (!data.session) redirect("/retailer/login?confirm=1");
@@ -340,7 +384,7 @@ async function signIn(
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role,full_name,phone")
     .eq("id", data.user.id)
     .maybeSingle();
 
@@ -361,6 +405,27 @@ async function signIn(
   if (!role) {
     await supabase.auth.signOut({ scope: "local" });
     return { error: "This account isn't set up yet. Please sign up first.", values };
+  }
+
+  // Auth creation and profile/worker writes are separate operations. If a
+  // signup stopped after creating the profile, an authenticated retry repairs
+  // the missing worker row without creating another Auth user.
+  if (role === "worker") {
+    try {
+      await provisionWorker({
+        userId: data.user.id,
+        email: data.user.email ?? email,
+        fullName: profile?.full_name ?? data.user.user_metadata?.full_name ?? "",
+        phone: profile?.phone ?? data.user.user_metadata?.phone ?? "",
+      });
+    } catch (err) {
+      console.error("[signIn] worker provisioning repair failed", err);
+      await supabase.auth.signOut({ scope: "local" });
+      return {
+        error: "We couldn't finish setting up your worker profile. Please try again or contact support.",
+        values,
+      };
+    }
   }
 
   // Repair app_metadata if it drifted from the profile role.
@@ -427,14 +492,30 @@ export async function requestPasswordReset(
   validateEmail(email, fieldErrors);
   if (Object.keys(fieldErrors).length) return { fieldErrors, values: { email } };
 
-  const supabase = await createClient();
-  const siteUrl = await getSiteUrl();
+  try {
+    const supabase = await createClient();
+    const siteUrl = await getSiteUrl();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+    });
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
-  });
-
-  if (error) console.error("[requestPasswordReset]", error.message);
+    if (error) {
+      console.error("[requestPasswordReset] Supabase Auth rejected request", error.code ?? "unknown");
+      return {
+        error: "We couldn't send a reset link right now. Please try again in a few minutes or contact support.",
+        values: { email },
+      };
+    }
+  } catch (err) {
+    console.error(
+      "[requestPasswordReset] request failed",
+      err instanceof Error ? err.message : "unknown error",
+    );
+    return {
+      error: "We couldn't send a reset link right now. Please try again in a few minutes or contact support.",
+      values: { email },
+    };
+  }
 
   // Always the same answer, so this cannot be used to discover which
   // email addresses have accounts.

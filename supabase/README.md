@@ -10,10 +10,28 @@ column is removed, and re-running them is safe.
    project → **SQL Editor** → **New query**.
 2. Paste the whole of `migrations/0001_supabase_auth_architecture.sql`, run it.
 3. Paste the whole of `migrations/0002_hire_and_reject_rpc.sql`, run it.
-4. Then `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`,
-   `0011` and `0012` in order, the same way.
+4. Then `0003` through `0016` in order, the same way.
 
 (Or, with the CLI linked to this project: `supabase db push`.)
+
+## What 0013–0016 do
+
+Migrations 0013–0015 are the existing worker signup payment, membership
+protection, and free-mode shift-application changes. Migration 0016 adds the
+single `email_workflow_deliveries` idempotency ledger for Worker Welcome,
+Retailer Welcome, and retailer reminder attempts, plus
+`retailer_onboarding_reminders` for the 14-day first-shift schedule. It adds
+triggers to initialise reminder schedules on owner links only and stop reminders
+when a store's first shift is inserted, and backfills schedules for existing
+retailers. Both tables use RLS with browser roles revoked and service-role
+access granted. It does not modify worker payment or membership data and does
+not change Supabase Auth SMTP. Re-running replaces only the two named trigger
+functions, recreates their named triggers, and leaves existing schedule rows
+unchanged.
+
+For a database where 0013–0015 are confirmed present but 0016 objects are
+absent, review and apply only `migrations/0016_automated_email_workflows.sql`.
+Do not apply a second welcome-email ledger migration.
 
 ## What 0001 does
 
