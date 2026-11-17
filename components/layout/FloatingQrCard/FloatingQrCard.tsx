@@ -14,7 +14,7 @@ export default function FloatingQrCard() {
         onClick={() => setExpanded(true)}
         aria-label="Show ShiftSupport QR code"
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
+        <svg viewBox="0 0 25 24" aria-hidden="true">
           <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM15 14h2v2h-2zM18 14h2v4h-2zM14 18h4v2h-4z" />
         </svg>
         <span>Scan QR to open on mobile</span>
