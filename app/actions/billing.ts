@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireRetailer, requireWorker } from "@/lib/auth/session";
+import { isWorkerSignupCheckoutEnabled, isWorkerSignupFreeMode } from "@/lib/signup-checkout";
 import { getSiteUrl } from "@/lib/site";
 import { priceShift } from "@/lib/pricing";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -96,6 +97,16 @@ async function ensureCustomer(worker: {
 /** Starts the $18/year membership subscription checkout for the signed-in worker. */
 export async function startMembershipCheckout(): Promise<ActionResult> {
   const { user, profile, worker } = await requireWorker();
+
+  // The pricing UI is not a security boundary: reject direct calls as well.
+  // Preserve the existing $18/year flow for a future explicitly enabled paid mode.
+  if (!isWorkerSignupCheckoutEnabled()) {
+    return fail(
+      isWorkerSignupFreeMode()
+        ? "Free Worker Access is enabled. No membership payment is required."
+        : "Worker membership checkout is currently disabled.",
+    );
+  }
 
   if (!isStripeConfigured()) {
     console.error("[billing] Membership checkout requested but Stripe is not configured.");

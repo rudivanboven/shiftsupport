@@ -15,12 +15,18 @@ import { buttonClass } from "@/components/ui/buttonClass";
  */
 export function MembershipActions({
   hasMembership,
+  showStart = true,
   startLabel = "Activate membership",
   manageLabel = "Manage membership",
+  checkoutAvailable = true,
+  unavailableMessage = "Worker membership checkout is currently disabled.",
 }: {
   hasMembership: boolean;
+  showStart?: boolean;
   startLabel?: string;
   manageLabel?: string;
+  checkoutAvailable?: boolean;
+  unavailableMessage?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -39,27 +45,36 @@ export function MembershipActions({
 
   return (
     <>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-        <button
-          type="button"
-          className={buttonClass("primary")}
-          onClick={() => go(startMembershipCheckout)}
-          disabled={pending}
-        >
-          {pending ? "Opening secure checkout…" : startLabel}
-        </button>
+      {showStart && !checkoutAvailable ? (
+        <p role="status" style={{ margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.5 }}>
+          {unavailableMessage}
+        </p>
+      ) : null}
+      {((showStart && checkoutAvailable) || hasMembership) ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {showStart && checkoutAvailable ? (
+            <button
+              type="button"
+              className={buttonClass("primary")}
+              onClick={() => go(startMembershipCheckout)}
+              disabled={pending}
+            >
+              {pending ? "Opening secure checkout…" : startLabel}
+            </button>
+          ) : null}
 
-        {hasMembership ? (
-          <button
-            type="button"
-            className={buttonClass("ghost")}
-            onClick={() => go(openBillingPortal)}
-            disabled={pending}
-          >
-            {manageLabel}
-          </button>
-        ) : null}
-      </div>
+          {hasMembership ? (
+            <button
+              type="button"
+              className={buttonClass("ghost")}
+              onClick={() => go(openBillingPortal)}
+              disabled={pending}
+            >
+              {manageLabel}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
         <p

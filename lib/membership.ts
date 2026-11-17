@@ -2,6 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 
+import { isWorkerSignupFreeMode } from "@/lib/signup-checkout";
+import { workerHasAccessInMode } from "@/lib/worker-access";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -54,6 +56,7 @@ export function grantsAccess(
  * request, the same way the session helpers do.
  */
 export const getMembership = cache(async (workerId: string): Promise<Membership> => {
+  const freeMode = isWorkerSignupFreeMode();
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -69,10 +72,10 @@ export const getMembership = cache(async (workerId: string): Promise<Membership>
     // Fail closed — an unverifiable membership is not an active one — but say
     // so in the log rather than pretending the worker was refused.
     console.error("[membership] Could not read membership state:", error.message);
-    return { ...INACTIVE, unavailable: true };
+    return { ...INACTIVE, active: freeMode, unavailable: true };
   }
 
-  if (!data) return INACTIVE;
+  if (!data) return { ...INACTIVE, active: freeMode };
 
   const row = data as {
     membership_status: MembershipStatus | null;
@@ -88,7 +91,11 @@ export const getMembership = cache(async (workerId: string): Promise<Membership>
     startedAt: row.membership_started_at,
     expiresAt: row.membership_expires_at,
     cancelAtPeriodEnd: Boolean(row.membership_cancel_at_period_end),
-    active: grantsAccess(status, row.membership_expires_at),
+    active: workerHasAccessInMode(
+      freeMode ? "free" : "paid",
+      status,
+      row.membership_expires_at,
+    ),
   };
 });
 
@@ -98,6 +105,14 @@ export function membershipNotice(membership: Membership): {
   text: string;
   cta: string;
 } {
+  if (isWorkerSignupFreeMode()) {
+    return {
+      title: "Free Worker Access",
+      text: "Browse available shifts and apply without a membership payment. Your stored membership status and billing history remain unchanged.",
+      cta: "View pricing and payments",
+    };
+  }
+
   switch (membership.status) {
     case "past_due":
       return {

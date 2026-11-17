@@ -17,6 +17,8 @@ NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...      # server-only, never NEXT_PUBLIC_
 NEXT_PUBLIC_SITE_URL=...           # production origin used for auth email links
+WORKER_SIGNUP_MODE=free             # free by default; paid mode is opt-in
+WORKER_SIGNUP_CHECKOUT_ENABLED=false # requires paid mode and exact true to open $18/year Checkout
 EMAIL_PROVIDER=resend
 EMAIL_FROM=ShiftSupport <noreply@shiftsupport.net>
 RESEND_API_KEY=...                 # server-only, never NEXT_PUBLIC_
@@ -32,6 +34,13 @@ STRIPE_WEBHOOK_SECRET=...
 Payments (worker membership + retailer shift checkout) are documented in
 [`STRIPE.md`](STRIPE.md). The internal Super Admin area is documented in
 [`SUPER_ADMIN.md`](SUPER_ADMIN.md).
+
+Workers have Free Access by default. Keep `WORKER_SIGNUP_MODE=free` and
+`WORKER_SIGNUP_CHECKOUT_ENABLED=false` (or unset) to prevent membership
+Checkout. Existing membership statuses, subscriptions, payment history and
+Stripe webhook processing remain unchanged. The existing $18/year subscription
+Checkout can be made available later only by setting `WORKER_SIGNUP_MODE=paid`
+and `WORKER_SIGNUP_CHECKOUT_ENABLED=true` together.
 
 **Before the app will work, run the SQL migrations** — see
 [`supabase/README.md`](supabase/README.md).

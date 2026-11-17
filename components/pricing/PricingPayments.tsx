@@ -13,6 +13,7 @@ import {
   IconUser,
 } from "@/components/dashboard/Icons";
 import { formatDate, formatMoney } from "@/lib/format";
+import { isWorkerSignupCheckoutEnabled, isWorkerSignupFreeMode } from "@/lib/signup-checkout";
 import {
   MEMBERSHIP_MONTHS,
   RETAILER_HOURLY_RATE,
@@ -37,8 +38,10 @@ import styles from "./PricingPayments.module.css";
 const EXAMPLE_HOURS = 5;
 const example = priceShift(EXAMPLE_HOURS);
 
-const WORKER_FLOW = [
-  ["Membership", "An active membership is what opens up shift opportunities."],
+const workerFlow = (freeMode: boolean): readonly (readonly [string, string])[] => [
+  ["Access", freeMode
+    ? "Worker access is free while Free Mode is enabled."
+    : "An active membership is what opens up shift opportunities."],
   ["Access shifts", "Browse the shifts you are eligible for from Available Shifts."],
   ["Apply", "Apply to the shifts that fit your schedule."],
   ["Get hired", "The retailer reviews applicants and confirms who they want."],
@@ -142,15 +145,19 @@ function BreakdownRow({
 function MembershipPanel({
   membership,
   checkout,
+  freeMode,
 }: {
   membership: Membership;
   checkout?: "success" | "canceled" | null;
+  freeMode: boolean;
 }) {
   // A just-returned checkout that the database has not confirmed yet. The URL
   // is only a hint that something may have happened — never a confirmation.
-  const confirming = checkout === "success" && !membership.active;
+  const confirming = !freeMode && checkout === "success" && !membership.active;
 
-  const tone = membership.active
+  const tone = freeMode
+    ? "approved"
+    : membership.active
     ? membership.status === "past_due"
       ? "pending"
       : "approved"
@@ -158,7 +165,9 @@ function MembershipPanel({
       ? "pending"
       : "neutral";
 
-  const label = confirming
+  const label = freeMode
+    ? "Free Access"
+    : confirming
     ? "Confirming…"
     : membership.active
       ? membership.status === "past_due"
@@ -168,15 +177,18 @@ function MembershipPanel({
         ? "Ended"
         : "Not active";
 
-  const expiryLabel =
-    membership.cancelAtPeriodEnd || membership.status === "canceled"
+  const expiryLabel = freeMode
+    ? "Recorded membership expiry"
+    : membership.cancelAtPeriodEnd || membership.status === "canceled"
       ? "Access until"
       : "Renews on";
 
   return (
     <Panel
       title="Your membership"
-      description="Membership state comes from Stripe — it updates here as soon as a payment is confirmed."
+      description={freeMode
+        ? "Free Mode grants access without changing your stored membership status or billing history."
+        : "Membership state comes from Stripe — it updates here as soon as a payment is confirmed."}
     >
       <div className={styles.membership}>
         <div className={styles.membershipState}>
@@ -190,10 +202,15 @@ function MembershipPanel({
               </p>
               <ConfirmingPoller />
             </>
-          ) : checkout === "canceled" ? (
+          ) : checkout === "canceled" && !freeMode ? (
             <p className={styles.membershipNote}>
               Checkout was cancelled, so no membership was started and nothing was
               charged. You can start it again whenever you are ready.
+            </p>
+          ) : freeMode ? (
+            <p className={styles.membershipNote}>
+              You can browse and apply for eligible shifts without a membership payment.
+              Any existing Stripe subscription remains available to manage below.
             </p>
           ) : membership.active ? (
             <p className={styles.membershipNote}>
@@ -221,7 +238,9 @@ function MembershipPanel({
           <div>
             <dt>Renewal</dt>
             <dd>
-              {membership.cancelAtPeriodEnd
+              {freeMode
+                ? "No membership charge while Free Mode is enabled"
+                : membership.cancelAtPeriodEnd
                 ? "Cancels at period end"
                 : membership.active
                   ? "Renews yearly"
@@ -233,6 +252,9 @@ function MembershipPanel({
         <div className={styles.membershipActions}>
           <MembershipActions
             hasMembership={membership.status !== "inactive"}
+            showStart={!freeMode}
+            checkoutAvailable={isWorkerSignupCheckoutEnabled()}
+            unavailableMessage="Membership checkout is disabled. Free Worker Access is available."
             startLabel={
               membership.active
                 ? "Update membership"
@@ -259,6 +281,7 @@ export default function PricingPayments({
   checkout?: "success" | "canceled" | null;
 }) {
   const isWorker = role === "worker";
+  const freeMode = isWorker && isWorkerSignupFreeMode();
 
   return (
     <>
@@ -267,7 +290,9 @@ export default function PricingPayments({
         title={isWorker ? "Your membership and pay" : "Your shift costs, explained"}
         description={
           isWorker
-            ? "Everything a ShiftSupport worker pays for, and everything a completed shift pays out. These details are only shown to signed-in members."
+            ? freeMode
+              ? "Worker access is free while Free Mode is enabled. Existing membership and payment records are unchanged."
+              : "Everything a ShiftSupport worker pays for, and everything a completed shift pays out. These details are only shown to signed-in members."
             : "What a ShiftSupport shift costs and how that cost is calculated. These details are only shown to signed-in retailers."
         }
       />
@@ -276,23 +301,39 @@ export default function PricingPayments({
         {isWorker ? (
           <>
             {membership ? (
-              <MembershipPanel membership={membership} checkout={checkout} />
+              <MembershipPanel membership={membership} checkout={checkout} freeMode={freeMode} />
             ) : null}
 
             <section className={styles.cardGrid}>
-              <PriceCard
-                tone="dark"
-                icon={<IconUser width={18} height={18} />}
-                eyebrow="Worker membership"
-                amount={formatMoney(WORKER_ANNUAL_MEMBERSHIP)}
-                unit="/ year"
-                title="One membership, twelve months of access"
-                points={[
-                  `Worker membership is valid for ${MEMBERSHIP_MONTHS} months.`,
-                  "An active membership provides access to eligible shift opportunities.",
-                  "Membership renewal is required once the membership period expires.",
-                ]}
-              />
+              {freeMode ? (
+                <PriceCard
+                  tone="dark"
+                  icon={<IconUser width={18} height={18} />}
+                  eyebrow="Worker access"
+                  amount="Free"
+                  unit="while Free Mode is enabled"
+                  title="Free access to eligible shifts"
+                  points={[
+                    "No membership signup payment is required.",
+                    "Browse eligible shifts and apply for local work.",
+                    "Stored membership and historical billing records are preserved.",
+                  ]}
+                />
+              ) : (
+                <PriceCard
+                  tone="dark"
+                  icon={<IconUser width={18} height={18} />}
+                  eyebrow="Worker membership"
+                  amount={formatMoney(WORKER_ANNUAL_MEMBERSHIP)}
+                  unit="/ year"
+                  title="One membership, twelve months of access"
+                  points={[
+                    `Worker membership is valid for ${MEMBERSHIP_MONTHS} months.`,
+                    "An active membership provides access to eligible shift opportunities.",
+                    "Membership renewal is required once the membership period expires.",
+                  ]}
+                />
+              )}
               <PriceCard
                 icon={<IconCash width={18} height={18} />}
                 eyebrow="Worker gross rate"
@@ -308,9 +349,11 @@ export default function PricingPayments({
 
             <Panel
               title="How it works, start to finish"
-              description="From an active membership through to the record of a completed shift."
+              description={freeMode
+                ? "From free access through to the record of a completed shift."
+                : "From an active membership through to the record of a completed shift."}
             >
-              <FlowSteps steps={WORKER_FLOW} />
+              <FlowSteps steps={workerFlow(freeMode)} />
             </Panel>
           </>
         ) : (

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getMembership } from "@/lib/membership";
+import { isWorkerSignupFreeMode } from "@/lib/signup-checkout";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type Result<T = undefined> =
@@ -35,9 +37,10 @@ export async function applyForShift(shiftId: string): Promise<Result> {
 
   if (!worker) return fail("We couldn't find your worker profile.");
 
-  // Membership is checked here for a clear message, and again by the database:
-  // the INSERT policy on shift_applications calls worker_membership_active(),
-  // so a request that skips this action is refused too.
+  // Free Mode grants access without changing the worker's stored membership.
+  // In that mode, insertion goes through the restricted service-role RPC;
+  // paid mode continues to use the normal RLS-protected insert.
+  const freeMode = isWorkerSignupFreeMode();
   const membership = await getMembership(worker.id as string);
   if (!membership.active) {
     return fail(
@@ -58,11 +61,18 @@ export async function applyForShift(shiftId: string): Promise<Result> {
     return fail("This shift isn't live yet.");
   }
 
-  const { error } = await supabase.from("shift_applications").insert({
+  const application = {
     shift_id: shiftId,
     worker_id: worker.id,
     status: "pending",
-  });
+  };
+
+  const { error } = freeMode
+    ? await createAdminClient().rpc("apply_for_shift_free_mode", {
+        p_worker_id: worker.id,
+        p_shift_id: shiftId,
+      })
+    : await supabase.from("shift_applications").insert(application);
 
   if (error) {
     if (error.code === "23505") return fail("You've already applied for this shift.");
