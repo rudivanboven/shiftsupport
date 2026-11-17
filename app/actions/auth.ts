@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendRetailerWelcomeEmail, sendWorkerWelcomeEmail } from "@/lib/email/server";
 import { getSiteUrl } from "@/lib/site";
 import {
   type FieldErrors,
@@ -160,6 +161,8 @@ async function provisionRetailer(input: {
     .eq("auth_user_id", input.userId)
     .maybeSingle();
 
+  let storeId = (existingLink?.store_id as string | undefined) ?? null;
+
   if (!existingLink) {
     const { data: store, error: storeError } = await admin
       .from("stores")
@@ -171,9 +174,10 @@ async function provisionRetailer(input: {
       .select("id")
       .single();
     if (storeError) throw storeError;
+    storeId = store!.id as string;
 
     const { error: linkError } = await admin.from("store_users").insert({
-      store_id: store!.id,
+      store_id: storeId,
       auth_user_id: input.userId,
       email: input.email,
       role: "owner",
@@ -182,6 +186,7 @@ async function provisionRetailer(input: {
   }
 
   await setRole(input.userId, "retailer");
+  return { storeId };
 }
 
 /* ------------------------------------------------------------------ *
@@ -237,6 +242,13 @@ export async function signUpWorker(
     console.error("[signUpWorker] provisioning failed", err);
     return { error: "We created your login but could not finish your profile. Please contact support.", values };
   }
+
+  await sendWorkerWelcomeEmail({
+    userId: data.user.id,
+    email,
+    fullName,
+    siteUrl,
+  });
 
   if (!data.session) redirect("/worker/login?confirm=1");
 
@@ -294,8 +306,9 @@ export async function signUpRetailer(
   }
   if (!data.user) return { error: GENERIC_ERROR, values };
 
+  let provisionedStoreId: string | null = null;
   try {
-    await provisionRetailer({
+    const provisioned = await provisionRetailer({
       userId: data.user.id,
       email,
       fullName,
@@ -304,10 +317,20 @@ export async function signUpRetailer(
       storeAddress,
       storePhone,
     });
+    provisionedStoreId = provisioned.storeId;
   } catch (err) {
     console.error("[signUpRetailer] provisioning failed", err);
     return { error: "We created your login but could not finish setting up your store. Please contact support.", values };
   }
+
+  await sendRetailerWelcomeEmail({
+    userId: data.user.id,
+    storeId: provisionedStoreId,
+    email,
+    fullName,
+    storeName,
+    siteUrl,
+  });
 
   if (!data.session) redirect("/retailer/login?confirm=1");
 

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --test tests/worker-access.test.mjs tests/email-workflows.test.mjs",
     "test:worker-access": "node --test tests/worker-access.test.mjs",
+    "test:email-workflows": "node --test tests/email-workflows.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
