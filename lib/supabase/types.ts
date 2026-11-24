@@ -101,6 +101,14 @@ export interface Shift {
      Not selected by the original shift queries; read via lib/data/series. */
   series_id?: string | null;
   occurrence_date?: string | null;
+  /* Shift visibility, posting expiry, and renewal tracking (migration 0019).
+     Posting expiry (`posting_expires_at`) is distinct from the scheduled work
+     window (`start_time` / `end_time`). */
+  is_hidden?: boolean;
+  hidden_at?: string | null;
+  posting_expires_at?: string | null;
+  renewed_at?: string | null;
+  renewal_count?: number;
 }
 
 export type ShiftSeriesStatus = "active" | "ended" | "cancelled";

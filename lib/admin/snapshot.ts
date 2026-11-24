@@ -86,6 +86,11 @@ export interface AdminShift {
   amount_paid_cents: number | null;
   paid_at: string | null;
   published_at: string | null;
+  is_hidden?: boolean;
+  hidden_at?: string | null;
+  posting_expires_at?: string | null;
+  renewed_at?: string | null;
+  renewal_count?: number;
 }
 
 export interface AdminApplication {
@@ -239,7 +244,7 @@ export const loadSnapshot = cache(async (): Promise<Snapshot> => {
       readAll<AdminStore>(db, "stores", "id,name,address,contact_phone,created_at", "created_at", warnings),
       readAll<AdminStoreUser>(db, "store_users", "id,store_id,auth_user_id,email,role,created_at", "created_at", warnings),
       readAll<AdminShift>(db, "shifts",
-        "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at,completed_at,payment_status,amount_paid_cents,paid_at,published_at",
+        "*",
         "created_at", warnings),
       readAll<AdminApplication>(db, "shift_applications", "id,shift_id,worker_id,status,applied_at,reviewed_at,rejection_reason", "applied_at", warnings),
       readAll<AdminPayment>(db, "shift_payments",
@@ -356,8 +361,17 @@ export function storeRating(s: Snapshot, storeId: string) {
 }
 
 /** Open to applications in the marketplace right now (the shifts_select rule). */
-export const isOpenShift = (sh: AdminShift) =>
-  sh.status === "open" && !sh.accepted_by && (sh.payment_status === "paid" || sh.payment_status === "legacy");
+export const isOpenShift = (sh: AdminShift) => {
+  const nowLocal = wallClockNow();
+  return (
+    sh.status === "open" &&
+    !sh.accepted_by &&
+    !sh.is_hidden &&
+    normaliseWallClock(sh.posting_expires_at ?? sh.end_time) > nowLocal &&
+    normaliseWallClock(sh.end_time) > nowLocal &&
+    (sh.payment_status === "paid" || sh.payment_status === "legacy")
+  );
+};
 
 export const isHired = (sh: AdminShift) => Boolean(sh.accepted_by) && sh.status !== "cancelled";
 

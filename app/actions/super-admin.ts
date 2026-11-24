@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { assertSuperAdmin, adminDb, NotAuthorisedError } from "@/lib/admin/auth";
-import { parseLocalDateTime } from "@/lib/admin/dates";
+import { normaliseWallClock, parseLocalDateTime, wallClockNow } from "@/lib/admin/dates";
 import { loadSnapshot, payrollStage, workerContact } from "@/lib/admin/snapshot";
 import { getEmailProvider } from "@/lib/email";
 import {
@@ -16,9 +16,9 @@ import {
   prepareAdpPayrollBatch,
   type PayrollLine,
 } from "@/lib/payroll";
-import { WORKER_HOURLY_RATE } from "@/lib/pricing";
+import { RETAILER_HOURLY_RATE, WORKER_HOURLY_RATE, shiftWindow } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
-import { EMAIL_RE, type FormState, str } from "@/lib/validation";
+import { EMAIL_RE, type FieldErrors, type FormState, str } from "@/lib/validation";
 
 /**
  * Operations Control Center mutations.
@@ -615,4 +615,844 @@ export async function sendRetailerInvoiceEmailAction(
     console.error("[super-admin] sendRetailerInvoiceEmailAction failed:", message);
     return { error: message };
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Shift Management — Super Admin Only (Edit, Renew, Delete / Archive)
+ * ------------------------------------------------------------------ */
+
+const TIME_RE = /^\d{2}:\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isMissingRpcError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return (
+    error.code === "PGRST202" ||
+    error.code === "42883" ||
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    Boolean(
+      error.message &&
+        /Could not find the function|function .* does not exist|column .* does not exist/i.test(
+          error.message,
+        ),
+    )
+  );
+}
+
+function parseWallClockDateTime(dateStr: string, timeStr?: string): string | null {
+  if (!dateStr) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateStr)) {
+    return `${dateStr}:00`;
+  }
+  if (DATE_RE.test(dateStr)) {
+    const t = timeStr && TIME_RE.test(timeStr) ? timeStr : "23:59";
+    return `${dateStr}T${t}:00`;
+  }
+  return null;
+}
+
+export async function adminToggleShiftVisibilityAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const denied = await guard();
+  if (denied) return denied;
+
+  const shiftId = str(formData.get("shiftId"));
+  const targetHidden = str(formData.get("isHidden")) === "true";
+
+  if (!UUID_RE.test(shiftId)) return { error: "Unknown shift." };
+
+  const supabase = await createClient();
+  const rpcResult = await supabase.rpc("admin_set_shift_visibility", {
+    p_shift_id: shiftId,
+    p_is_hidden: targetHidden,
+  });
+
+  if (!rpcResult.error) {
+    revalidateShiftPaths(shiftId, []);
+    return {
+      success: targetHidden
+        ? "Shift is now hidden from workers."
+        : "Shift is visible to workers again.",
+    };
+  }
+
+  if (!isMissingRpcError(rpcResult.error)) {
+    return { error: rpcMessage(rpcResult.error) };
+  }
+
+  const admin = await assertSuperAdmin();
+  const db = await adminDb();
+
+  const { data: existingShift, error: loadErr } = await db
+    .from("shifts")
+    .select("*")
+    .eq("id", shiftId)
+    .maybeSingle();
+
+  if (loadErr || !existingShift) {
+    return { error: "That shift no longer exists." };
+  }
+
+  if (existingShift.status === "completed" || existingShift.status === "cancelled") {
+    return { error: "Completed or deleted shifts cannot be hidden or shown." };
+  }
+
+  if (!targetHidden) {
+    const nowLocal = wallClockNow();
+    const expiryRef =
+      (existingShift.posting_expires_at as string | null) ?? (existingShift.end_time as string);
+    if (
+      normaliseWallClock(expiryRef) <= nowLocal ||
+      normaliseWallClock(existingShift.end_time as string) <= nowLocal
+    ) {
+      return {
+        error:
+          "This shift posting has expired. Renew or extend the expiry date before showing it to workers.",
+      };
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  const { error: updateErr } = await db
+    .from("shifts")
+    .update({
+      is_hidden: targetHidden,
+      hidden_at: targetHidden ? nowIso : null,
+      updated_at: nowIso,
+    })
+    .eq("id", shiftId);
+
+  if (updateErr) {
+    console.error("[super-admin] adminToggleShiftVisibilityAction failed:", updateErr.message);
+    return { error: "Could not update shift visibility. Please try again." };
+  }
+
+  await db.from("admin_audit_log").insert({
+    actor_user_id: admin.user.id,
+    actor_email: admin.email,
+    action: targetHidden ? "shift.hidden" : "shift.shown",
+    target_type: "shift",
+    target_id: shiftId,
+    metadata: {
+      actor_role: "super_admin",
+      store_id: existingShift.store_id,
+      task_type: existingShift.task_type,
+      is_hidden: targetHidden,
+    },
+  });
+
+  revalidateShiftPaths(shiftId, [existingShift.store_id as string]);
+  return {
+    success: targetHidden
+      ? `Shift "${existingShift.task_type}" is now hidden from workers.`
+      : `Shift "${existingShift.task_type}" is visible to workers again.`,
+  };
+}
+
+export async function adminExtendShiftAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const denied = await guard();
+  if (denied) return denied;
+
+  const shiftId = str(formData.get("shiftId"));
+  const postingExpiresDate = str(formData.get("postingExpiresDate"));
+  const postingExpiresTime = str(formData.get("postingExpiresTime")).slice(0, 5) || "23:59";
+  const updateSchedule = str(formData.get("updateSchedule")) === "true";
+  const date = str(formData.get("date"));
+  const startTime = str(formData.get("startTime")).slice(0, 5);
+  const endTime = str(formData.get("endTime")).slice(0, 5);
+
+  const values = {
+    postingExpiresDate,
+    postingExpiresTime,
+    updateSchedule: updateSchedule ? "true" : "false",
+    date,
+    startTime,
+    endTime,
+  };
+
+  if (!UUID_RE.test(shiftId)) return { error: "Unknown shift.", values };
+
+  const fieldErrors: FieldErrors = {};
+  if (!postingExpiresDate || !DATE_RE.test(postingExpiresDate)) {
+    fieldErrors.postingExpiresDate = "Pick a valid posting expiry date.";
+  }
+  if (!TIME_RE.test(postingExpiresTime)) {
+    fieldErrors.postingExpiresTime = "Pick a valid expiry time.";
+  }
+
+  const nowLocal = wallClockNow();
+  const postingExpiresAt = parseWallClockDateTime(postingExpiresDate, postingExpiresTime);
+  if (postingExpiresAt && normaliseWallClock(postingExpiresAt) <= nowLocal) {
+    fieldErrors.postingExpiresDate = "The new posting expiry date and time must be in the future.";
+  }
+
+  let startWallClock: string | null = null;
+  let endWallClock: string | null = null;
+  let duration: number | null = null;
+
+  if (updateSchedule) {
+    if (!date || !DATE_RE.test(date)) fieldErrors.date = "Pick a valid scheduled shift date.";
+    if (!startTime || !TIME_RE.test(startTime)) fieldErrors.startTime = "Pick a valid start time.";
+    if (!endTime || !TIME_RE.test(endTime)) fieldErrors.endTime = "Pick a valid end time.";
+
+    if (Object.keys(fieldErrors).length === 0) {
+      const slot = shiftWindow(date, startTime, endTime);
+      if (!slot) {
+        fieldErrors.endTime = "The shift must be longer than zero hours.";
+      } else if (slot.hours > 24) {
+        fieldErrors.endTime = "A single shift cannot be longer than 24 hours.";
+      } else {
+        startWallClock = `${date}T${startTime}:00`;
+        endWallClock = `${slot.endDate}T${endTime}:00`;
+        duration = slot.hours;
+      }
+    }
+  }
+
+  if (Object.keys(fieldErrors).length) return { fieldErrors, values };
+
+  const supabase = await createClient();
+  const rpcResult = await supabase.rpc("admin_extend_shift_posting", {
+    p_shift_id: shiftId,
+    p_posting_expires_at: postingExpiresAt,
+    p_start_time: startWallClock,
+    p_end_time: endWallClock,
+    p_duration: duration,
+  });
+
+  if (!rpcResult.error) {
+    revalidateShiftPaths(shiftId, []);
+    return {
+      success: updateSchedule
+        ? `Posting expiry extended to ${postingExpiresDate} (${postingExpiresTime}) and scheduled work time updated to ${date} (${startTime}–${endTime}).`
+        : `Posting expiry extended to ${postingExpiresDate} (${postingExpiresTime}). Scheduled shift work time remains unchanged.`,
+      values,
+    };
+  }
+
+  if (!isMissingRpcError(rpcResult.error)) {
+    return { error: rpcMessage(rpcResult.error), values };
+  }
+
+  const admin = await assertSuperAdmin();
+  const db = await adminDb();
+
+  const { data: existingShift, error: loadErr } = await db
+    .from("shifts")
+    .select("*")
+    .eq("id", shiftId)
+    .maybeSingle();
+
+  if (loadErr || !existingShift) {
+    return { error: "That shift no longer exists.", values };
+  }
+
+  if (existingShift.status === "completed" || existingShift.completed_at) {
+    return { error: "Completed shifts cannot be extended.", values };
+  }
+
+  const [{ data: existingInvoice }, { data: existingEntry }] = await Promise.all([
+    db.from("retailer_invoices").select("id").eq("shift_id", shiftId).maybeSingle(),
+    db.from("shift_time_entries").select("id").eq("shift_id", shiftId).maybeSingle(),
+  ]);
+
+  if (existingInvoice) {
+    return { error: "Invoiced shifts cannot be extended.", values };
+  }
+  if (existingEntry) {
+    return { error: "Shifts with recorded work hours cannot be extended.", values };
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    posting_expires_at: postingExpiresAt,
+    updated_at: new Date().toISOString(),
+  };
+  if (updateSchedule && startWallClock && endWallClock && duration) {
+    updatePayload.start_time = startWallClock;
+    updatePayload.end_time = endWallClock;
+    updatePayload.duration = duration;
+    if (existingShift.series_id) {
+      updatePayload.occurrence_date = date;
+    }
+  }
+
+  const { error: updateErr } = await db.from("shifts").update(updatePayload).eq("id", shiftId);
+  if (updateErr) {
+    console.error("[super-admin] adminExtendShiftAction failed:", updateErr.message);
+    return { error: "Could not extend shift. Please try again.", values };
+  }
+
+  await db.from("admin_audit_log").insert({
+    actor_user_id: admin.user.id,
+    actor_email: admin.email,
+    action: "shift.extended",
+    target_type: "shift",
+    target_id: shiftId,
+    metadata: {
+      actor_role: "super_admin",
+      store_id: existingShift.store_id,
+      task_type: existingShift.task_type,
+      previous_posting_expires_at: existingShift.posting_expires_at,
+      new_posting_expires_at: postingExpiresAt,
+      schedule_changed: updateSchedule,
+      previous_start_time: existingShift.start_time,
+      new_start_time: startWallClock ?? existingShift.start_time,
+      previous_end_time: existingShift.end_time,
+      new_end_time: endWallClock ?? existingShift.end_time,
+    },
+  });
+
+  revalidateShiftPaths(shiftId, [existingShift.store_id as string]);
+  return {
+    success: updateSchedule
+      ? `Posting expiry extended to ${postingExpiresDate} (${postingExpiresTime}) and scheduled work time updated to ${date} (${startTime}–${endTime}).`
+      : `Posting expiry extended to ${postingExpiresDate} (${postingExpiresTime}). Scheduled shift work time remains unchanged.`,
+    values,
+  };
+}
+
+function revalidateShiftPaths(shiftId: string, storeIds: (string | null | undefined)[]) {
+  revalidatePath("/super-admin/shifts");
+  revalidatePath(`/super-admin/shifts/${shiftId}`);
+  revalidatePath("/super-admin/payroll");
+  revalidatePath("/super-admin/audit");
+  revalidatePath("/retailer/dashboard");
+  revalidatePath("/retailer/shifts");
+  revalidatePath("/worker/available-shifts");
+  revalidatePath("/worker/dashboard");
+  for (const storeId of storeIds) {
+    if (storeId && UUID_RE.test(storeId)) {
+      revalidatePath(`/super-admin/retailers/${storeId}`);
+    }
+  }
+}
+
+export async function adminEditShiftAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const denied = await guard();
+  if (denied) return denied;
+
+  const shiftId = str(formData.get("shiftId"));
+  const storeId = str(formData.get("storeId"));
+  const taskType = oneLine(str(formData.get("taskType")), 200);
+  const description = String(formData.get("description") ?? "").trim().slice(0, 2000);
+  const shiftLocation = oneLine(str(formData.get("shiftLocation")), 300);
+  const date = str(formData.get("date"));
+  const startTime = str(formData.get("startTime")).slice(0, 5);
+  const endTime = str(formData.get("endTime")).slice(0, 5);
+  const hourlyRateRaw = str(formData.get("hourlyRate")) || String(RETAILER_HOURLY_RATE);
+
+  const values = {
+    storeId,
+    taskType,
+    description,
+    shiftLocation,
+    date,
+    startTime,
+    endTime,
+    hourlyRate: hourlyRateRaw,
+  };
+
+  if (!UUID_RE.test(shiftId)) return { error: "Unknown shift.", values };
+
+  const fieldErrors: FieldErrors = {};
+  if (!UUID_RE.test(storeId)) fieldErrors.storeId = "Choose a valid store.";
+  if (!taskType) fieldErrors.taskType = "Tell workers what the shift involves.";
+  if (!shiftLocation) fieldErrors.shiftLocation = "Enter the location for this shift.";
+  if (!date || !DATE_RE.test(date)) fieldErrors.date = "Enter a valid date (YYYY-MM-DD).";
+  if (!startTime || !TIME_RE.test(startTime)) fieldErrors.startTime = "Enter a valid start time.";
+  if (!endTime || !TIME_RE.test(endTime)) fieldErrors.endTime = "Enter a valid end time.";
+
+  const hourlyRate = Number(hourlyRateRaw);
+  if (!Number.isFinite(hourlyRate) || hourlyRate <= 0 || hourlyRate > 500) {
+    fieldErrors.hourlyRate = "Hourly rate must be between $1 and $500.";
+  }
+
+  if (Object.keys(fieldErrors).length) return { fieldErrors, values };
+
+  const slot = shiftWindow(date, startTime, endTime);
+  if (!slot) {
+    return { fieldErrors: { endTime: "The shift must be longer than zero hours." }, values };
+  }
+  if (slot.hours > 24) {
+    return { fieldErrors: { endTime: "A single shift cannot be longer than 24 hours." }, values };
+  }
+
+  const startWallClock = `${date}T${startTime}:00`;
+  const endWallClock = `${slot.endDate}T${endTime}:00`;
+  const duration = slot.hours;
+  const roundedRate = Math.round(hourlyRate * 100) / 100;
+
+  const supabase = await createClient();
+  const rpcResult = await supabase.rpc("admin_update_shift", {
+    p_shift_id: shiftId,
+    p_store_id: storeId,
+    p_task_type: taskType,
+    p_description: description || null,
+    p_shift_location: shiftLocation,
+    p_start_time: startWallClock,
+    p_end_time: endWallClock,
+    p_duration: duration,
+    p_hourly_rate: roundedRate,
+  });
+
+  if (!rpcResult.error) {
+    revalidateShiftPaths(shiftId, [storeId]);
+    return {
+      success: `Shift "${taskType}" updated (${duration}h @ $${roundedRate}/hr).`,
+      values,
+    };
+  }
+
+  if (!isMissingRpcError(rpcResult.error)) {
+    return { error: rpcMessage(rpcResult.error), values };
+  }
+
+  // Fallback for environments where migration 0019 has not been executed yet:
+  // enforce the exact same Super Admin checks, business rules, and audit trail.
+  const admin = await assertSuperAdmin();
+  const db = await adminDb();
+
+  const { data: existingShift, error: loadErr } = await db
+    .from("shifts")
+    .select("*")
+    .eq("id", shiftId)
+    .maybeSingle();
+
+  if (loadErr || !existingShift) {
+    return { error: "That shift no longer exists.", values };
+  }
+
+  const { data: storeRow } = await db
+    .from("stores")
+    .select("id,name")
+    .eq("id", storeId)
+    .maybeSingle();
+  if (!storeRow) {
+    return { fieldErrors: { storeId: "Selected store does not exist." }, values };
+  }
+
+  const [{ data: existingInvoice }, { data: existingEntry }] = await Promise.all([
+    db.from("retailer_invoices").select("id").eq("shift_id", shiftId).maybeSingle(),
+    db
+      .from("shift_time_entries")
+      .select("id,approval_status,payroll_status")
+      .eq("shift_id", shiftId)
+      .maybeSingle(),
+  ]);
+
+  const prevStart = String(existingShift.start_time).replace(" ", "T").slice(0, 19);
+  const prevEnd = String(existingShift.end_time).replace(" ", "T").slice(0, 19);
+  const scheduleChanged =
+    startWallClock !== prevStart ||
+    endWallClock !== prevEnd ||
+    duration !== Number(existingShift.duration);
+
+  if (existingShift.status === "completed" || existingShift.completed_at) {
+    if (storeId !== existingShift.store_id || scheduleChanged) {
+      return {
+        error:
+          "This shift has already been marked completed, so its store and scheduled work hours cannot be changed.",
+        values,
+      };
+    }
+  }
+
+  if (existingInvoice) {
+    const prevRate = Number(existingShift.hourly_rate ?? RETAILER_HOURLY_RATE);
+    if (storeId !== existingShift.store_id || roundedRate !== prevRate || scheduleChanged) {
+      return {
+        error:
+          "An invoice has already been generated for this shift, so its store, schedule, and hourly rate cannot be changed.",
+        values,
+      };
+    }
+  }
+
+  if (
+    existingEntry &&
+    (existingEntry.approval_status === "approved" ||
+      ["ready", "exported", "submitted", "processed"].includes(
+        String(existingEntry.payroll_status),
+      )) &&
+    (storeId !== existingShift.store_id || scheduleChanged)
+  ) {
+    return {
+      error:
+        "This shift has approved timesheets or payroll records, so its store and scheduled work window cannot be changed.",
+      values,
+    };
+  }
+
+  if (existingShift.series_id && storeId !== existingShift.store_id) {
+    return {
+      error: "This shift belongs to a recurring series and must stay with its series store.",
+      values,
+    };
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    store_id: storeId,
+    task_type: taskType,
+    description: description || null,
+    shift_location: shiftLocation,
+    start_time: startWallClock,
+    end_time: endWallClock,
+    duration,
+    hourly_rate: roundedRate,
+    updated_at: new Date().toISOString(),
+  };
+  if (existingShift.series_id) {
+    updatePayload.occurrence_date = date;
+  }
+
+  const { error: updateErr } = await db.from("shifts").update(updatePayload).eq("id", shiftId);
+  if (updateErr) {
+    console.error("[super-admin] adminEditShiftAction update failed:", updateErr.message);
+    return { error: "Could not save shift changes. Please try again.", values };
+  }
+
+  await db.from("admin_audit_log").insert({
+    actor_user_id: admin.user.id,
+    actor_email: admin.email,
+    action: "shift.updated",
+    target_type: "shift",
+    target_id: shiftId,
+    metadata: {
+      store_id: storeId,
+      previous_store_id: existingShift.store_id,
+      task_type: taskType,
+      previous_task_type: existingShift.task_type,
+      start_time: startWallClock,
+      previous_start_time: existingShift.start_time,
+      end_time: endWallClock,
+      previous_end_time: existingShift.end_time,
+      duration,
+      previous_duration: existingShift.duration,
+      hourly_rate: roundedRate,
+      previous_hourly_rate: existingShift.hourly_rate,
+    },
+  });
+
+  revalidateShiftPaths(shiftId, [storeId, existingShift.store_id as string]);
+  return {
+    success: `Shift "${taskType}" updated (${duration}h @ $${roundedRate}/hr).`,
+    values,
+  };
+}
+
+export async function adminRenewShiftAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const denied = await guard();
+  if (denied) return denied;
+
+  const shiftId = str(formData.get("shiftId"));
+  const date = str(formData.get("date"));
+  const startTime = str(formData.get("startTime")).slice(0, 5);
+  const endTime = str(formData.get("endTime")).slice(0, 5);
+  const postingExpiresDate = str(formData.get("postingExpiresDate"));
+  const postingExpiresTime = str(formData.get("postingExpiresTime")).slice(0, 5) || "23:59";
+  const values = { date, startTime, endTime, postingExpiresDate, postingExpiresTime };
+
+  if (!UUID_RE.test(shiftId)) return { error: "Unknown shift.", values };
+
+  const fieldErrors: FieldErrors = {};
+  if (!date || !DATE_RE.test(date)) fieldErrors.date = "Pick a valid renewal date.";
+  if (!startTime || !TIME_RE.test(startTime)) fieldErrors.startTime = "Pick a valid start time.";
+  if (!endTime || !TIME_RE.test(endTime)) fieldErrors.endTime = "Pick a valid end time.";
+  if (postingExpiresDate && !DATE_RE.test(postingExpiresDate)) {
+    fieldErrors.postingExpiresDate = "Pick a valid posting expiry date.";
+  }
+  if (Object.keys(fieldErrors).length) return { fieldErrors, values };
+
+  const slot = shiftWindow(date, startTime, endTime);
+  if (!slot) {
+    return { fieldErrors: { endTime: "The shift must be longer than zero hours." }, values };
+  }
+  if (slot.hours > 24) {
+    return { fieldErrors: { endTime: "A single shift cannot be longer than 24 hours." }, values };
+  }
+
+  const startWallClock = `${date}T${startTime}:00`;
+  const endWallClock = `${slot.endDate}T${endTime}:00`;
+  const duration = slot.hours;
+  const postingExpiresAt = postingExpiresDate
+    ? parseWallClockDateTime(postingExpiresDate, postingExpiresTime)
+    : null;
+
+  // Ensure the renewed shift ends in the future so workers can see and apply to it.
+  const nowLocal = wallClockNow();
+  if (normaliseWallClock(endWallClock) <= nowLocal) {
+    return {
+      fieldErrors: {
+        date: "Pick a future date and time so the renewed shift is active in the marketplace.",
+      },
+      values,
+    };
+  }
+  if (postingExpiresAt && normaliseWallClock(postingExpiresAt) <= nowLocal) {
+    return {
+      fieldErrors: {
+        postingExpiresDate: "The posting expiry date and time must be in the future.",
+      },
+      values,
+    };
+  }
+
+  const supabase = await createClient();
+  const rpcResult = await supabase.rpc("admin_renew_shift", {
+    p_shift_id: shiftId,
+    p_start_time: startWallClock,
+    p_end_time: endWallClock,
+    p_duration: duration,
+    p_posting_expires_at: postingExpiresAt,
+  });
+
+  if (!rpcResult.error) {
+    revalidateShiftPaths(shiftId, []);
+    return {
+      success: `Shift renewed and republished as OPEN for ${date} (${startTime}–${endTime}).`,
+      values,
+    };
+  }
+
+  if (!isMissingRpcError(rpcResult.error)) {
+    return { error: rpcMessage(rpcResult.error), values };
+  }
+
+  // Fallback when migration 0019 RPC is not yet installed in DB
+  const admin = await assertSuperAdmin();
+  const db = await adminDb();
+
+  const { data: existingShift, error: loadErr } = await db
+    .from("shifts")
+    .select("*")
+    .eq("id", shiftId)
+    .maybeSingle();
+
+  if (loadErr || !existingShift) {
+    return { error: "That shift no longer exists.", values };
+  }
+
+  if (existingShift.status === "completed" || existingShift.completed_at) {
+    return { error: "Completed shifts cannot be renewed.", values };
+  }
+  if (existingShift.accepted_by) {
+    return {
+      error:
+        "A worker is already hired for this shift. Edit the shift schedule instead of renewing the posting.",
+      values,
+    };
+  }
+
+  const [{ data: existingInvoice }, { data: existingEntry }] = await Promise.all([
+    db.from("retailer_invoices").select("id").eq("shift_id", shiftId).maybeSingle(),
+    db.from("shift_time_entries").select("id").eq("shift_id", shiftId).maybeSingle(),
+  ]);
+
+  if (existingEntry) {
+    return { error: "Shifts with recorded work hours cannot be renewed.", values };
+  }
+  if (existingInvoice) {
+    return { error: "Shifts with an invoice cannot be renewed.", values };
+  }
+
+  const nowIso = new Date().toISOString();
+  const nextRenewalCount = Number(existingShift.renewal_count ?? 0) + 1;
+  const updatePayload: Record<string, unknown> = {
+    status: "open",
+    is_hidden: false,
+    hidden_at: null,
+    start_time: startWallClock,
+    end_time: endWallClock,
+    duration,
+    posting_expires_at: postingExpiresAt,
+    renewed_at: nowIso,
+    renewal_count: nextRenewalCount,
+    payment_status: existingShift.payment_status === "paid" ? "paid" : "legacy",
+    published_at: nowIso,
+    updated_at: nowIso,
+  };
+  if (existingShift.series_id) {
+    updatePayload.occurrence_date = date;
+  }
+
+  const { error: updateErr } = await db.from("shifts").update(updatePayload).eq("id", shiftId);
+  if (updateErr) {
+    console.error("[super-admin] adminRenewShiftAction update failed:", updateErr.message);
+    return { error: "Could not renew that shift. Please try again.", values };
+  }
+
+  await db.from("admin_audit_log").insert({
+    actor_user_id: admin.user.id,
+    actor_email: admin.email,
+    action: "shift.renewed",
+    target_type: "shift",
+    target_id: shiftId,
+    metadata: {
+      store_id: existingShift.store_id,
+      task_type: existingShift.task_type,
+      previous_status: existingShift.status,
+      new_status: "open",
+      previous_start_time: existingShift.start_time,
+      new_start_time: startWallClock,
+      previous_end_time: existingShift.end_time,
+      new_end_time: endWallClock,
+      duration,
+    },
+  });
+
+  revalidateShiftPaths(shiftId, [existingShift.store_id as string]);
+  return {
+    success: `Shift renewed and republished as OPEN for ${date} (${startTime}–${endTime}).`,
+    values,
+  };
+}
+
+export async function adminDeleteShiftAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const denied = await guard();
+  if (denied) return denied;
+
+  const shiftId = str(formData.get("shiftId"));
+  const reason = oneLine(str(formData.get("reason")), 300);
+
+  if (!UUID_RE.test(shiftId)) return { error: "Unknown shift." };
+
+  const supabase = await createClient();
+  const rpcResult = await supabase.rpc("admin_delete_shift", {
+    p_shift_id: shiftId,
+    p_reason: reason || null,
+  });
+
+  if (!rpcResult.error) {
+    revalidateShiftPaths(shiftId, []);
+    return {
+      success:
+        "Shift cancelled and archived. All historical application and audit records have been preserved.",
+    };
+  }
+
+  if (!isMissingRpcError(rpcResult.error)) {
+    return { error: rpcMessage(rpcResult.error) };
+  }
+
+  // Fallback when migration 0019 RPC is not yet installed in DB
+  const admin = await assertSuperAdmin();
+  const db = await adminDb();
+
+  const { data: existingShift, error: loadErr } = await db
+    .from("shifts")
+    .select("*")
+    .eq("id", shiftId)
+    .maybeSingle();
+
+  if (loadErr || !existingShift) {
+    return { error: "That shift no longer exists." };
+  }
+
+  if (existingShift.status === "cancelled") {
+    return { error: "This shift has already been deleted / cancelled." };
+  }
+
+  if (existingShift.status === "completed" || existingShift.completed_at) {
+    return {
+      error: "Cannot delete this shift because it has completed work on record.",
+    };
+  }
+
+  const [{ data: existingInvoice }, { data: existingEntry }, { data: paidPayment }] =
+    await Promise.all([
+      db.from("retailer_invoices").select("id").eq("shift_id", shiftId).maybeSingle(),
+      db
+        .from("shift_time_entries")
+        .select("id,approval_status,approved_hours,payroll_status")
+        .eq("shift_id", shiftId)
+        .maybeSingle(),
+      db
+        .from("shift_payments")
+        .select("id")
+        .eq("shift_id", shiftId)
+        .eq("status", "paid")
+        .maybeSingle(),
+    ]);
+
+  if (existingInvoice) {
+    return {
+      error:
+        "Cannot delete this shift because a retailer invoice has already been generated for it.",
+    };
+  }
+
+  if (existingEntry) {
+    if (existingEntry.approval_status === "approved" || existingEntry.approved_hours !== null) {
+      return {
+        error:
+          "Cannot delete this shift because worked hours have already been approved for payroll.",
+      };
+    }
+    if (
+      ["ready", "exported", "submitted", "processed"].includes(
+        String(existingEntry.payroll_status),
+      )
+    ) {
+      return {
+        error: "Cannot delete this shift because it has active payroll records.",
+      };
+    }
+    return {
+      error: "Cannot delete this shift because worked hours have been recorded in a timesheet.",
+    };
+  }
+
+  if (existingShift.payment_status === "paid" || paidPayment) {
+    return {
+      error: "Cannot delete this shift because it has a confirmed payment record.",
+    };
+  }
+
+  const { error: updateErr } = await db
+    .from("shifts")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", shiftId);
+
+  if (updateErr) {
+    console.error("[super-admin] adminDeleteShiftAction update failed:", updateErr.message);
+    return { error: "Could not delete that shift. Please try again." };
+  }
+
+  await db.from("admin_audit_log").insert({
+    actor_user_id: admin.user.id,
+    actor_email: admin.email,
+    action: "shift.deleted",
+    target_type: "shift",
+    target_id: shiftId,
+    metadata: {
+      store_id: existingShift.store_id,
+      task_type: existingShift.task_type,
+      previous_status: existingShift.status,
+      new_status: "cancelled",
+      had_hired_worker: Boolean(existingShift.accepted_by),
+      accepted_by: existingShift.accepted_by,
+      reason: reason || null,
+    },
+  });
+
+  revalidateShiftPaths(shiftId, [existingShift.store_id as string]);
+  return {
+    success:
+      "Shift cancelled and archived. All historical application and audit records have been preserved.",
+  };
 }

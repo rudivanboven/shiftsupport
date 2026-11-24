@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { normaliseWallClock, wallClockNow } from "@/lib/admin/dates";
 import { getMembership } from "@/lib/membership";
 import { isWorkerSignupFreeMode } from "@/lib/signup-checkout";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -50,13 +51,23 @@ export async function applyForShift(shiftId: string): Promise<Result> {
 
   const { data: shift } = await supabase
     .from("shifts")
-    .select("id,status,accepted_by,payment_status")
+    .select("*")
     .eq("id", shiftId)
     .maybeSingle();
 
   if (!shift) return fail("That shift is no longer available.");
   if (shift.accepted_by) return fail("Someone has already been hired for this shift.");
-  if (shift.status !== "open") return fail("This shift is no longer open for applications.");
+  if (shift.status !== "open" || shift.is_hidden) {
+    return fail("This shift is no longer open for applications.");
+  }
+  const nowLocal = wallClockNow();
+  const expiryRef = (shift.posting_expires_at as string | null) ?? (shift.end_time as string | null);
+  if (
+    (expiryRef && normaliseWallClock(expiryRef) <= nowLocal) ||
+    (shift.end_time && normaliseWallClock(shift.end_time as string) <= nowLocal)
+  ) {
+    return fail("This shift posting has expired and is no longer accepting applications.");
+  }
 
   const application = {
     shift_id: shiftId,

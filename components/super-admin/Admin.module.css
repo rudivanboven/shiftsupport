@@ -1264,6 +1264,331 @@ a.invoiceCellTitle:hover {
   background: #f4f0e8;
 }
 
+/* ─── Super Admin Shift Cards (Responsive Two-Column Card Layout) ─── */
+
+.shiftToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(
+    180deg,
+    rgba(22, 48, 36, 0.025),
+    rgba(255, 253, 248, 0.45)
+  );
+}
+
+.shiftToolbarCount {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: var(--w-medium);
+  color: var(--muted);
+}
+
+.shiftToolbarCount strong {
+  font-weight: var(--w-semibold);
+  color: var(--ink);
+}
+
+.shiftSortGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.shiftSortLabel {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.shiftSortPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: var(--w-medium);
+  color: var(--muted);
+  text-decoration: none;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.shiftSortPill:hover {
+  border-color: rgba(46, 123, 60, 0.35);
+  color: var(--ink);
+}
+
+.shiftSortPillActive {
+  border-color: rgba(46, 123, 60, 0.4);
+  background: rgba(46, 123, 60, 0.09);
+  font-weight: var(--w-semibold);
+  color: var(--brand-green);
+}
+
+.shiftCardBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+}
+
+.shiftCardColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 22px;
+  min-width: 0;
+}
+
+.shiftCardColumn + .shiftCardColumn {
+  border-left: 1px solid var(--line);
+  background: rgba(255, 253, 248, 0.4);
+}
+
+.shiftSectionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  min-width: 0;
+}
+
+.shiftInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.shiftInfoItemFull {
+  grid-column: 1 / -1;
+}
+
+.shiftInfoLabel {
+  font-family: var(--font-heading);
+  font-size: 10.5px;
+  font-weight: var(--w-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.shiftInfoValue {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: var(--w-semibold);
+  line-height: 1.4;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+a.shiftInfoValue:hover {
+  color: var(--brand-green);
+  text-decoration: underline;
+}
+
+.shiftInfoMeta {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.shiftInfoBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.shiftStatusRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  min-width: 0;
+}
+
+.shiftQuickActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.shiftFooterLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.shiftFooterTopRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  width: 100%;
+}
+
+.shiftFooterInvoiceWrap {
+  padding-top: 12px;
+  border-top: 1px dashed rgba(22, 48, 36, 0.14);
+  width: 100%;
+}
+
+.shiftManageWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(22, 48, 36, 0.14);
+}
+
+.shiftManageButtonGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.shiftDeleteBtn {
+  border: 1px solid rgba(185, 64, 52, 0.28);
+  background: #ffffff;
+  color: #9e3328;
+  box-shadow: 0 1px 2px rgba(185, 64, 52, 0.05);
+}
+
+.shiftDeleteBtn:hover:not(:disabled) {
+  border-color: #b94034;
+  background: rgba(185, 64, 52, 0.06);
+  color: #8c291f;
+  box-shadow: 0 4px 12px rgba(185, 64, 52, 0.1);
+}
+
+.shiftDeleteBtnActive {
+  border-color: #b94034;
+  background: rgba(185, 64, 52, 0.1);
+  color: #8c291f;
+}
+
+.shiftModalPanel {
+  margin-top: 6px;
+  padding: 18px 20px;
+  border: 1px solid rgba(22, 48, 36, 0.16);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(22, 48, 36, 0.07);
+}
+
+.shiftDeletePanel {
+  border-color: rgba(185, 64, 52, 0.35);
+  background: #fffafa;
+}
+
+.shiftModalHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shiftModalTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: var(--w-semibold);
+  color: var(--ink);
+}
+
+.shiftModalSubtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.shiftModalForm {
+  width: 100%;
+}
+
+.shiftLiveCalcBox {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(244, 240, 232, 0.5);
+}
+
+@media (max-width: 980px) {
+  .shiftCardBody {
+    grid-template-columns: 1fr;
+  }
+
+  .shiftCardColumn + .shiftCardColumn {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 680px) {
+  .shiftToolbar {
+    padding: 12px 16px;
+  }
+
+  .shiftCardColumn {
+    padding: 16px;
+  }
+
+  .shiftSectionGrid,
+  .shiftStatusRow {
+    grid-template-columns: 1fr;
+  }
+
+  .shiftFooterTopRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .shiftQuickActions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 440px) {
+  .shiftQuickActions {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 1024px) {
   .invoiceDataTable,
   .invoiceDataTable thead,

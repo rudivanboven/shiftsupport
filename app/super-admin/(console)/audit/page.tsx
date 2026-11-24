@@ -24,7 +24,8 @@ interface AuditRow {
 
 const toneFor = (action: string) => {
   if (action.startsWith("access.")) return "approved" as const;
-  if (action.includes("rejected") || action.includes("error") || action.includes("revoked") || action.includes("failed")) return "cancelled" as const;
+  if (action.includes("deleted") || action.includes("rejected") || action.includes("error") || action.includes("revoked") || action.includes("failed")) return "cancelled" as const;
+  if (action.startsWith("shift.")) return "open" as const;
   if (action.startsWith("payroll.")) return "filled" as const;
   if (action.startsWith("communication.")) return "open" as const;
   return "neutral" as const;
@@ -84,6 +85,7 @@ export default async function AuditPage({
       <Metrics tone="neutral">
         <Metric label="Entries" value={all.length} hint="Most recent 1,000" />
         <Metric label="Access changes" value={all.filter((r) => r.action.startsWith("access.")).length} />
+        <Metric label="Shift actions" value={all.filter((r) => r.action.startsWith("shift.")).length} />
         <Metric label="Payroll actions" value={all.filter((r) => r.action.startsWith("payroll.")).length} />
         <Metric label="Communications" value={all.filter((r) => r.action.startsWith("communication.")).length} />
       </Metrics>
@@ -97,6 +99,7 @@ export default async function AuditPage({
           options={[
             { value: "", label: "All" },
             { value: "access", label: "Admin access" },
+            { value: "shift", label: "Shift management" },
             { value: "payroll", label: "Payroll & hours" },
             { value: "communication", label: "Communications" },
             { value: "export", label: "Exports" },

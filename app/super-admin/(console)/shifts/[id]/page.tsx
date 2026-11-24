@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Badge, EmptyState, PageHeader, Panel } from "@/components/ui/Kit";
 import ContactActions from "@/components/super-admin/ContactActions";
 import { GenerateOrManageInvoiceActions } from "@/components/super-admin/InvoiceActions";
+import { ShiftManagementActions } from "@/components/super-admin/ShiftManagementActions";
 import { RecordHoursForm, ReviewHoursForm } from "@/components/super-admin/forms";
 import { DefinitionList, Metric, Metrics, Notice, hours as hoursText, money } from "@/components/super-admin/ui";
 import { contactLinks } from "@/lib/admin/contact";
@@ -121,6 +122,59 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
   const status = SHIFT_STATUS[shift.status];
   const paymentLabel = PAYMENT_STATUS[shift.payment_status];
 
+  const storeList = snapshot.stores
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((s) => ({ value: s.id, label: s.name }));
+
+  const isExpired =
+    (hasFinished ||
+      (shift.posting_expires_at ?? shift.end_time).replace(" ", "T") <= wallClockNow()) &&
+    shift.status !== "completed" &&
+    shift.status !== "cancelled";
+  const canRenew =
+    shift.status !== "completed" &&
+    !shift.completed_at &&
+    !shift.accepted_by &&
+    !entry &&
+    !existingInvoice &&
+    (isExpired || shift.status === "cancelled" || shift.status === "draft" || shift.status === "open");
+
+  let deleteBlockedReason: string | undefined;
+  if (shift.status === "completed" || shift.completed_at) {
+    deleteBlockedReason =
+      "Cannot delete this shift because it has completed work on record.";
+  } else if (existingInvoice) {
+    deleteBlockedReason = `Cannot delete this shift because Invoice #${existingInvoice.invoiceNumber} has already been generated for it.`;
+  } else if (entry) {
+    if (entry.approval_status === "approved" || entry.approved_hours !== null) {
+      deleteBlockedReason =
+        "Cannot delete this shift because worked hours have already been approved for payroll.";
+    } else if (["ready", "exported", "submitted", "processed"].includes(entry.payroll_status)) {
+      deleteBlockedReason =
+        "Cannot delete this shift because it has active payroll records.";
+    } else {
+      deleteBlockedReason =
+        "Cannot delete this shift because worked hours have been recorded in a timesheet.";
+    }
+  } else if (shift.payment_status === "paid" || payment?.status === "paid") {
+    deleteBlockedReason =
+      "Cannot delete this shift because it has a confirmed payment record.";
+  }
+  const canDelete = shift.status !== "cancelled" && !deleteBlockedReason;
+
+  const payrollLocked = Boolean(
+    entry && ["exported", "submitted", "processed"].includes(entry.payroll_status),
+  );
+  const canChangeStoreOrRate = !existingInvoice && !payrollLocked && !series;
+  const storeOrRateLockedReason = existingInvoice
+    ? `Invoice #${existingInvoice.invoiceNumber} exists for this shift, so store and hourly rate are locked.`
+    : payrollLocked
+      ? "Payroll processing has started for this shift, so store reassignment is locked."
+      : series
+        ? "This shift belongs to a recurring series, so its store is locked to the series store."
+        : undefined;
+
   return (
     <>
       <Link href="/super-admin/shifts" className={styles.back}>
@@ -156,6 +210,51 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
         />
         <Metric label="Applicants" value={applications.length} />
       </Metrics>
+
+      <Panel
+        title="Shift management controls"
+        description="Super Admin controls to edit shift details, renew expired or cancelled postings, or safely archive/delete eligible shifts."
+      >
+        <ShiftManagementActions
+          shift={{
+            id: shift.id,
+            storeId: shift.store_id,
+            storeName: store?.name ?? "Unknown store",
+            taskType: shift.task_type,
+            description: shift.description,
+            shiftLocation: shift.shift_location ?? store?.address ?? "",
+            startTime: shift.start_time,
+            endTime: shift.end_time,
+            duration: shift.duration,
+            hourlyRate: shift.hourly_rate ?? RETAILER_HOURLY_RATE,
+            status: shift.status,
+            isHidden: Boolean(shift.is_hidden),
+            postingExpiresAt: shift.posting_expires_at ?? null,
+            renewedAt: shift.renewed_at ?? null,
+            renewalCount: Number(shift.renewal_count ?? 0),
+            isExpired,
+            hasHiredWorker: Boolean(shift.accepted_by),
+            isRecurring: Boolean(series),
+          }}
+          stores={storeList}
+          canRenew={canRenew}
+          renewDisabledReason={
+            shift.status === "completed" || shift.completed_at
+              ? "Completed shifts cannot be renewed."
+              : shift.accepted_by
+                ? "Worker already hired — use Edit Shift to adjust schedule."
+                : existingInvoice
+                  ? "Invoiced shifts cannot be renewed."
+                  : entry
+                    ? "Shifts with recorded hours cannot be renewed."
+                    : undefined
+          }
+          canDelete={canDelete}
+          deleteBlockedReason={deleteBlockedReason}
+          canChangeStoreOrRate={canChangeStoreOrRate}
+          storeOrRateLockedReason={storeOrRateLockedReason}
+        />
+      </Panel>
 
       <div className={styles.detailGrid}>
         <Panel title="Shift details">

@@ -15,8 +15,12 @@ export interface ApplicationWithContext extends ShiftApplication {
   workers: Pick<PublicWorker, "id" | "full_name"> | null;
 }
 
-const SHIFT_COLUMNS =
-  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at,payment_status,amount_paid_cents,paid_at,published_at";
+const SHIFT_COLUMNS = "*";
+
+export function isShiftPostingExpired(shift: Pick<Shift, "posting_expires_at" | "end_time" | "status">): boolean {
+  if (shift.status === "completed" || shift.status === "cancelled") return false;
+  return isPast(shift.posting_expires_at ?? shift.end_time) || isPast(shift.end_time);
+}
 
 /** Every shift belonging to the retailer's store, soonest first. */
 export async function getStoreShifts(storeId: string, limit?: number) {
@@ -106,14 +110,17 @@ export function summariseShifts(
   applications: ApplicationWithContext[],
 ): RetailerStats {
   const endsInFuture = (s: Shift) => !isPast(s.end_time);
+  const postingActive = (s: Shift) => !isShiftPostingExpired(s);
 
   return {
     activeShifts: shifts.filter(
-      (s) => s.status !== "cancelled" && s.status !== "draft" && endsInFuture(s),
+      (s) => s.status !== "cancelled" && s.status !== "draft" && !s.is_hidden && endsInFuture(s) && postingActive(s),
     ).length,
-    openShifts: shifts.filter((s) => s.status === "open" && !s.accepted_by).length,
+    openShifts: shifts.filter(
+      (s) => s.status === "open" && !s.accepted_by && !s.is_hidden && postingActive(s),
+    ).length,
     pendingApplications: applications.filter((a) => a.status === "pending").length,
-    filledShifts: shifts.filter((s) => Boolean(s.accepted_by)).length,
+    filledShifts: shifts.filter((s) => Boolean(s.accepted_by) && s.status !== "cancelled").length,
   };
 }
 

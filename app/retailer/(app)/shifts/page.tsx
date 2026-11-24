@@ -5,6 +5,7 @@ import {
   getHiredWorkerContacts,
   getStoreApplications,
   getStoreShifts,
+  isShiftPostingExpired,
 } from "@/lib/data/retailer";
 import { getShiftReviewStates } from "@/lib/data/reviews";
 import { getSeriesForShifts, getStoreSeries } from "@/lib/data/series";
@@ -14,24 +15,31 @@ import Tabs, { type TabItem } from "@/components/dashboard/Tabs";
 import { buttonClass } from "@/components/ui/buttonClass";
 import { IconCalendar, IconPlus } from "@/components/dashboard/Icons";
 import { isPast } from "@/lib/format";
+import { RETAILER_HOURLY_RATE } from "@/lib/pricing";
 import type { Shift } from "@/lib/supabase/types";
 import ShiftReviewBlock from "@/components/reviews/ShiftReviewBlock";
-import CancelShiftButton from "./ShiftActions";
+import { RetailerShiftManagementActions } from "./ShiftActions";
 import SeriesOverview from "./series/SeriesOverview";
 
 export const metadata: Metadata = { title: "My shifts | ShiftSupport" };
 
-type Filter = "all" | "open" | "filled" | "past";
+type Filter = "all" | "open" | "filled" | "expired" | "hidden" | "past";
 
 const matches = (shift: Shift, filter: Filter) => {
   const past = isPast(shift.end_time);
+  const expired = isShiftPostingExpired(shift);
+  const hidden = Boolean(shift.is_hidden);
   switch (filter) {
     case "open":
-      return shift.status === "open" && !shift.accepted_by && !past;
+      return shift.status === "open" && !shift.accepted_by && !hidden && !expired && !past;
     case "filled":
-      return Boolean(shift.accepted_by) && !past;
+      return Boolean(shift.accepted_by) && !past && shift.status !== "cancelled";
+    case "expired":
+      return expired && !shift.accepted_by && shift.status !== "cancelled";
+    case "hidden":
+      return hidden && shift.status !== "cancelled";
     case "past":
-      return past || shift.status === "cancelled";
+      return past || expired || shift.status === "cancelled" || shift.status === "completed";
     default:
       return true;
   }
@@ -44,9 +52,9 @@ export default async function RetailerShiftsPage({
 }) {
   const { store } = await requireRetailer();
   const params = await searchParams;
-  const filter: Filter = (["all", "open", "filled", "past"] as const).includes(
-    params.filter as Filter,
-  )
+  const filter: Filter = (
+    ["all", "open", "filled", "expired", "hidden", "past"] as const
+  ).includes(params.filter as Filter)
     ? (params.filter as Filter)
     : "all";
 
@@ -71,9 +79,11 @@ export default async function RetailerShiftsPage({
   const tabs: TabItem[] = (
     [
       ["all", "All shifts"],
-      ["open", "Open"],
+      ["open", "Active & Open"],
       ["filled", "Filled"],
-      ["past", "Past & cancelled"],
+      ["expired", "Expired"],
+      ["hidden", "Hidden"],
+      ["past", "Past & Deleted"],
     ] as const
   ).map(([key, label]) => ({
     key,
@@ -130,7 +140,10 @@ export default async function RetailerShiftsPage({
         <ShiftGrid>
           {visible.map((shift) => {
             const past = isPast(shift.end_time);
+            const expired = isShiftPostingExpired(shift);
+            const hidden = Boolean(shift.is_hidden);
             const cancelled = shift.status === "cancelled";
+            const renewed = Number(shift.renewal_count ?? 0) > 0;
 
             const hired = Boolean(shift.accepted_by);
             const workerName =
@@ -145,6 +158,25 @@ export default async function RetailerShiftsPage({
               </a>
             ) : null;
 
+            const badge =
+              shift.status === "draft"
+                ? { tone: "neutral" as const, label: "Draft" }
+                : cancelled
+                  ? { tone: "cancelled" as const, label: "Deleted / Archived" }
+                  : shift.status === "completed"
+                    ? { tone: "approved" as const, label: "Completed" }
+                    : hidden
+                      ? { tone: "pending" as const, label: "Hidden" }
+                      : expired && !hired
+                        ? { tone: "pending" as const, label: "Expired" }
+                        : past && hired
+                          ? { tone: "neutral" as const, label: "Finished" }
+                          : hired
+                            ? { tone: "filled" as const, label: "Filled" }
+                            : renewed
+                              ? { tone: "open" as const, label: "Active · Renewed" }
+                              : { tone: "open" as const, label: "Active" };
+
             return (
               <ShiftCard
                 key={shift.id}
@@ -152,29 +184,61 @@ export default async function RetailerShiftsPage({
                 storeAddress={store.address}
                 applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
                 series={series}
-                accent={cancelled || past ? "muted" : shift.accepted_by ? "peach" : "green"}
-                badge={
-                  shift.status === "draft"
-                    ? { tone: "neutral", label: "Draft" }
-                    : cancelled
-                    ? { tone: "cancelled", label: "Cancelled" }
-                    : shift.status === "completed"
-                      ? { tone: "neutral", label: "Completed" }
-                      : past
-                        ? { tone: "neutral", label: "Finished" }
-                        : shift.accepted_by
-                          ? { tone: "filled", label: "Filled" }
-                          : { tone: "open", label: "Open" }
+                accent={
+                  cancelled || hidden || (expired && !hired)
+                    ? "muted"
+                    : shift.accepted_by
+                      ? "peach"
+                      : "green"
+                }
+                badge={badge}
+                note={
+                  hidden
+                    ? {
+                        text: "Hidden from workers. Click Show Shift below whenever you are ready to make this posting visible again.",
+                        tone: "warning",
+                      }
+                    : expired && !hired && !cancelled
+                      ? {
+                          text: "This shift posting has expired. You can Renew Shift, Extend Date / Time, Edit Shift details, or Hide / Delete it below.",
+                          tone: "warning",
+                        }
+                      : undefined
                 }
                 footer={
-                  hired && past && !cancelled ? (
-                    <ShiftReviewBlock
-                      shiftId={shift.id}
-                      state={reviewStates.get(shift.id)}
-                      subjectName={workerName}
-                      canComplete={shift.status !== "completed"}
-                    />
-                  ) : null
+                  <>
+                    <div style={{ padding: "0 20px 18px" }}>
+                      <RetailerShiftManagementActions
+                        shift={{
+                          id: shift.id,
+                          storeName: store.name,
+                          taskType: shift.task_type,
+                          description: shift.description,
+                          shiftLocation: shift.shift_location ?? store.address ?? "",
+                          startTime: shift.start_time,
+                          endTime: shift.end_time,
+                          duration: shift.duration,
+                          hourlyRate: shift.hourly_rate ?? RETAILER_HOURLY_RATE,
+                          status: shift.status,
+                          isHidden: hidden,
+                          postingExpiresAt: shift.posting_expires_at ?? null,
+                          renewedAt: shift.renewed_at ?? null,
+                          renewalCount: Number(shift.renewal_count ?? 0),
+                          isExpired: expired,
+                          hasHiredWorker: hired,
+                          isPaid: shift.payment_status === "paid",
+                        }}
+                      />
+                    </div>
+                    {hired && past && !cancelled ? (
+                      <ShiftReviewBlock
+                        shiftId={shift.id}
+                        state={reviewStates.get(shift.id)}
+                        subjectName={workerName}
+                        canComplete={shift.status !== "completed"}
+                      />
+                    ) : null}
+                  </>
                 }
                 actions={
                   <>
@@ -191,12 +255,6 @@ export default async function RetailerShiftsPage({
                       {shift.payment_status === "paid" ? "Receipt" : "Shift summary"}
                     </a>
                     {seriesLink}
-                    {!cancelled && !past ? (
-                      <CancelShiftButton
-                        shiftId={shift.id}
-                        label={series ? "Cancel this date" : undefined}
-                      />
-                    ) : null}
                   </>
                 }
               />

@@ -9,8 +9,7 @@ import type {
   StoreContact,
 } from "@/lib/supabase/types";
 
-const SHIFT_COLUMNS =
-  "id,store_id,task_type,description,shift_location,start_time,end_time,duration,hourly_rate,status,accepted_by,created_at,payment_status";
+const SHIFT_COLUMNS = "*";
 
 /** `stores` has column-level privileges: contact_phone is not selectable here. */
 const STORE_COLUMNS = "id,name,address";
@@ -45,7 +44,10 @@ export async function getAvailableShifts() {
     .order("start_time", { ascending: true });
 
   const shifts = ((data ?? []) as unknown as ShiftWithStore[]).filter(
-    (shift) => !isPast(shift.end_time),
+    (shift) =>
+      !shift.is_hidden &&
+      !isPast(shift.posting_expires_at ?? shift.end_time) &&
+      !isPast(shift.end_time),
   );
 
   return { shifts, error: error?.message ?? null };

@@ -762,3 +762,258 @@ test("13. Super Admin Invoice Listing redesign: summary cards, wide columns with
   assert.match(adminCss, /\.invoiceActionFooter\s*\{/);
   assert.match(adminCss, /\.invoiceBtnPrimary\s*\{/);
 });
+
+test("14. Super Admin Shifts page redesign: replaces wide table with responsive two-column shift cards and full-width bottom action bar", async () => {
+  const [shiftsPage, adminCss] = await Promise.all([
+    readFile(
+      new URL(
+        "../app/super-admin/(console)/shifts/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/super-admin/Admin.module.css", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  // 1. Wide 11-column horizontal scrolling table is replaced by individual shift cards
+  assert.doesNotMatch(shiftsPage, /<table className=\{styles\.table\}>/);
+  assert.match(shiftsPage, /styles\.invoiceCardList/);
+  assert.match(shiftsPage, /styles\.invoiceCard/);
+  assert.match(shiftsPage, /styles\.invoiceCardHeader/);
+  assert.match(shiftsPage, /styles\.shiftCardBody/);
+  assert.match(shiftsPage, /styles\.invoiceActionFooter/);
+
+  // 2. All required shift card sections are displayed clearly
+  assert.match(shiftsPage, /Shift Date & Time/);
+  assert.match(shiftsPage, /Store \/ Retailer/);
+  assert.match(shiftsPage, /Scheduled Hours & Rate/);
+  assert.match(shiftsPage, /Payment & Shift Status/);
+  assert.match(shiftsPage, /Applications/);
+  assert.match(shiftsPage, /Hired Worker/);
+  assert.match(shiftsPage, /Payroll \/ ADP Status/);
+  assert.match(shiftsPage, /Invoice Status/);
+
+  // 3. Preserves filters, sorting, pagination, and full invoice actions (View Invoice, Preview PDF, Download PDF, Send Email)
+  assert.match(shiftsPage, /<RangeFilter/);
+  assert.match(shiftsPage, /<FilterBar/);
+  assert.match(shiftsPage, /<Pagination/);
+  assert.match(shiftsPage, /<GenerateOrManageInvoiceActions/);
+  assert.doesNotMatch(shiftsPage, /compact\s+existingInvoice/);
+
+  // 4. Responsive layout breakpoints exist in CSS for desktop, tablet, and mobile
+  assert.match(adminCss, /\.shiftCardBody\s*\{/);
+  assert.match(adminCss, /\.shiftSectionGrid\s*\{/);
+  assert.match(adminCss, /@media \(max-width: 980px\)/);
+});
+
+test("15. Super Admin Shift Management permissions: Edit, Renew, and Delete actions are strictly Super-Admin-gated, audited, and non-destructive", async () => {
+  const [
+    shiftsPage,
+    shiftDetailPage,
+    shiftManageComponent,
+    superAdminActions,
+    migration0019,
+    retailerShiftsPage,
+    workerShiftsPage,
+  ] = await Promise.all([
+    readFile(
+      new URL(
+        "../app/super-admin/(console)/shifts/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../app/super-admin/(console)/shifts/[id]/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../components/super-admin/ShiftManagementActions.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/actions/super-admin.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../supabase/migrations/0019_super_admin_shift_management.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../app/retailer/(app)/shifts/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../app/worker/(app)/available-shifts/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  // 1. Super Admin Shifts page and Shift Detail page include ShiftManagementActions
+  assert.match(shiftsPage, /<ShiftManagementActions/);
+  assert.match(shiftDetailPage, /<ShiftManagementActions/);
+
+  // 2. ShiftManagementActions provides Edit Shift, Renew Shift, and Delete Shift with confirmation dialog
+  assert.match(shiftManageComponent, /Edit Shift/);
+  assert.match(shiftManageComponent, /Renew Shift/);
+  assert.match(shiftManageComponent, /Delete Shift/);
+  assert.match(shiftManageComponent, /role="alertdialog"/);
+  assert.match(shiftManageComponent, /Confirm Delete Shift/);
+
+  // 3. Server actions enforce Super Admin guard before every mutation and never create duplicate shifts
+  assert.match(superAdminActions, /export async function adminEditShiftAction/);
+  assert.match(superAdminActions, /export async function adminRenewShiftAction/);
+  assert.match(superAdminActions, /export async function adminDeleteShiftAction/);
+  assert.match(superAdminActions, /admin_update_shift/);
+  assert.match(superAdminActions, /admin_renew_shift/);
+  assert.match(superAdminActions, /admin_delete_shift/);
+
+  // 4. Database migration 0019 enforces public.is_super_admin(), soft-deletion (status = 'cancelled'),
+  //    blocks deletion when completed work/invoices/timesheets/payroll exist, and logs to admin_audit_log
+  assert.match(migration0019, /create or replace function public\.admin_update_shift/);
+  assert.match(migration0019, /create or replace function public\.admin_renew_shift/);
+  assert.match(migration0019, /create or replace function public\.admin_delete_shift/);
+  assert.match(migration0019, /if v_uid is null or not public\.is_super_admin\(\) then/);
+  assert.match(migration0019, /'shift\.updated'/);
+  assert.match(migration0019, /'shift\.renewed'/);
+  assert.match(migration0019, /'shift\.deleted'/);
+  assert.doesNotMatch(migration0019, /delete from public\.shifts/i);
+
+  // 5. Retailer and Worker pages do not import or expose Super Admin shift management controls
+  assert.doesNotMatch(retailerShiftsPage, /components\/super-admin\/ShiftManagementActions/);
+  assert.doesNotMatch(retailerShiftsPage, /adminEditShiftAction|adminRenewShiftAction|adminDeleteShiftAction/);
+  assert.doesNotMatch(workerShiftsPage, /ShiftManagementActions|RetailerShiftManagementActions/);
+  assert.doesNotMatch(workerShiftsPage, /adminEditShiftAction|adminRenewShiftAction|adminDeleteShiftAction/);
+  assert.doesNotMatch(workerShiftsPage, /retailerEditShiftAction|retailerRenewShiftAction|retailerDeleteShiftAction/);
+});
+
+test("16. Retailer & Super Admin Shift Management: Hide, Show, Delete, Renew, Extend Date/Time (separate Posting Expiry vs Scheduled Work Time), and Edit with strict ownership & RBAC", async () => {
+  const [
+    retailerShiftsPage,
+    retailerDashboardPage,
+    retailerShiftActionsComponent,
+    retailerServerActions,
+    superAdminShiftManageComponent,
+    superAdminActions,
+    migration0019,
+    workerDataLayer,
+    workerAvailableShiftsPage,
+  ] = await Promise.all([
+    readFile(
+      new URL("../app/retailer/(app)/shifts/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/retailer/(app)/dashboard/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/retailer/(app)/shifts/ShiftActions.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/actions/shifts.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../components/super-admin/ShiftManagementActions.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../app/actions/super-admin.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../supabase/migrations/0019_super_admin_shift_management.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../lib/data/worker.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/worker/(app)/available-shifts/page.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  // 1. Retailer shift cards on both /retailer/shifts and /retailer/dashboard render RetailerShiftManagementActions
+  assert.match(retailerShiftsPage, /<RetailerShiftManagementActions/);
+  assert.match(retailerDashboardPage, /<RetailerShiftManagementActions/);
+
+  // 2. Expired and hidden shifts remain visible in Retailer dashboard with clear statuses (Active, Hidden, Expired, Active · Renewed, Completed)
+  assert.match(retailerShiftsPage, /\["expired",\s*"Expired"\]/);
+  assert.match(retailerShiftsPage, /\["hidden",\s*"Hidden"\]/);
+  assert.match(retailerShiftsPage, /label:\s*"Hidden"/);
+  assert.match(retailerShiftsPage, /label:\s*"Expired"/);
+  assert.match(retailerShiftsPage, /label:\s*"Active · Renewed"/);
+  assert.match(retailerShiftsPage, /label:\s*"Completed"/);
+
+  // 3. RetailerShiftManagementActions provides all 6 distinct management controls + delete confirmation dialog
+  assert.match(retailerShiftActionsComponent, /Edit Shift/);
+  assert.match(retailerShiftActionsComponent, /Extend Date \/ Time/);
+  assert.match(retailerShiftActionsComponent, /Renew Shift/);
+  assert.match(retailerShiftActionsComponent, /Hide Shift/);
+  assert.match(retailerShiftActionsComponent, /Show Shift/);
+  assert.match(retailerShiftActionsComponent, /Delete Shift/);
+  assert.match(retailerShiftActionsComponent, /role="alertdialog"/);
+  assert.match(retailerShiftActionsComponent, /Confirm Delete Shift/);
+
+  // 4. Separate Posting Visibility Expiry (`posting_expires_at`) vs Scheduled Shift Time (`start_time` / `end_time`)
+  assert.match(retailerShiftActionsComponent, /1\. Posting visibility expiry date/);
+  assert.match(retailerShiftActionsComponent, /2\. Also modify the scheduled shift work date/);
+  assert.match(superAdminShiftManageComponent, /1\. Posting visibility expiry date/);
+  assert.match(superAdminShiftManageComponent, /2\. Also change the actual scheduled work date/);
+  assert.match(retailerServerActions, /Scheduled shift work time remains unchanged/);
+  assert.match(superAdminActions, /Scheduled shift work time remains unchanged/);
+
+  // 5. Server actions strictly verify retailer ownership (`shift.store_id !== resolved.storeId`)
+  assert.match(retailerServerActions, /async function resolveRetailerOwnedShift/);
+  assert.match(retailerServerActions, /if \(shift\.store_id !== resolved\.storeId\)/);
+  assert.match(
+    retailerServerActions,
+    /You can only manage shifts posted under your own retailer account\./,
+  );
+
+  // 6. Database migration 0019 enforces `public.is_store_member(v_shift.store_id)` for retailers
+  //    and `public.is_super_admin()` for Super Admins, and hides hidden/expired shifts from workers
+  assert.match(migration0019, /create or replace function public\.retailer_update_shift/);
+  assert.match(migration0019, /create or replace function public\.retailer_set_shift_visibility/);
+  assert.match(migration0019, /create or replace function public\.retailer_extend_shift/);
+  assert.match(migration0019, /create or replace function public\.retailer_renew_shift/);
+  assert.match(migration0019, /create or replace function public\.retailer_delete_shift/);
+  assert.match(migration0019, /if not public\.is_store_member\(v_shift\.store_id\) then/);
+  assert.match(migration0019, /coalesce\(is_hidden, false\) = false/);
+  assert.match(
+    migration0019,
+    /coalesce\(posting_expires_at, end_time\) > public\.operations_now\(\)/,
+  );
+
+  // 7. Worker data layer filters out hidden and expired postings, and workers have zero management actions
+  assert.match(workerDataLayer, /!shift\.is_hidden/);
+  assert.match(workerDataLayer, /!isPast\(shift\.posting_expires_at \?\? shift\.end_time\)/);
+  assert.doesNotMatch(
+    workerAvailableShiftsPage,
+    /RetailerShiftManagementActions|ShiftManagementActions/,
+  );
+
+  // 8. Migration 0019 revokes hard DELETE on public.shifts and updates worker_can_view_series
+  assert.match(migration0019, /drop policy if exists shifts_delete_own_store on public\.shifts/);
+  assert.match(migration0019, /revoke delete on public\.shifts from anon, authenticated/);
+  assert.match(migration0019, /create or replace function public\.worker_can_view_series/);
+});

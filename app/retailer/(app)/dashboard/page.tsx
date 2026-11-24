@@ -4,6 +4,7 @@ import {
   countApplicationsByShift,
   getStoreApplications,
   getStoreShifts,
+  isShiftPostingExpired,
   summariseShifts,
 } from "@/lib/data/retailer";
 import { getShiftReviewStates, getStoreRating } from "@/lib/data/reviews";
@@ -22,7 +23,9 @@ import {
 import DashboardUserStrip from "@/components/dashboard/DashboardUserStrip";
 import { RatingBadge } from "@/components/reviews/Stars";
 import ShiftCard, { ShiftGrid } from "@/components/shifts/ShiftCard";
+import { RetailerShiftManagementActions } from "@/app/retailer/(app)/shifts/ShiftActions";
 import { buttonClass } from "@/components/ui/buttonClass";
+import { RETAILER_HOURLY_RATE } from "@/lib/pricing";
 import {
   IconCalendar,
   IconCheck,
@@ -163,29 +166,80 @@ export default async function RetailerDashboardPage() {
                   />
                 ) : (
                   <ShiftGrid>
-                    {recentShifts.map((shift) => (
-                      <ShiftCard
-                        key={shift.id}
-                        shift={shift}
-                        storeAddress={store.address}
-                        applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
-                        series={seriesByShift.get(shift.id)}
-                        accent={shift.status === "open" ? "green" : "muted"}
-                        badge={
-                          shift.status === "draft"
-                            ? { tone: "neutral", label: "Draft" }
-                            : undefined
-                        }
-                        actions={
-                          <a
-                            className={buttonClass("ghost", { small: true })}
-                            href={`/retailer/applicants?shift=${shift.id}`}
-                          >
-                            View applicants
-                          </a>
-                        }
-                      />
-                    ))}
+                    {recentShifts.map((shift) => {
+                      const expired = isShiftPostingExpired(shift);
+                      const hidden = Boolean(shift.is_hidden);
+                      const hired = Boolean(shift.accepted_by);
+                      const cancelled = shift.status === "cancelled";
+                      const renewed = Number(shift.renewal_count ?? 0) > 0;
+                      const badge =
+                        shift.status === "draft"
+                          ? { tone: "neutral" as const, label: "Draft" }
+                          : cancelled
+                            ? { tone: "cancelled" as const, label: "Deleted / Archived" }
+                            : shift.status === "completed"
+                              ? { tone: "approved" as const, label: "Completed" }
+                              : hidden
+                                ? { tone: "pending" as const, label: "Hidden" }
+                                : expired && !hired
+                                  ? { tone: "pending" as const, label: "Expired" }
+                                  : hired
+                                    ? { tone: "filled" as const, label: "Filled" }
+                                    : renewed
+                                      ? { tone: "open" as const, label: "Active · Renewed" }
+                                      : { tone: "open" as const, label: "Active" };
+
+                      return (
+                        <ShiftCard
+                          key={shift.id}
+                          shift={shift}
+                          storeAddress={store.address}
+                          applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
+                          series={seriesByShift.get(shift.id)}
+                          accent={
+                            cancelled || hidden || (expired && !hired)
+                              ? "muted"
+                              : hired
+                                ? "peach"
+                                : "green"
+                          }
+                          badge={badge}
+                          footer={
+                            <div style={{ padding: "0 20px 18px" }}>
+                              <RetailerShiftManagementActions
+                                shift={{
+                                  id: shift.id,
+                                  storeName: store.name,
+                                  taskType: shift.task_type,
+                                  description: shift.description,
+                                  shiftLocation: shift.shift_location ?? store.address ?? "",
+                                  startTime: shift.start_time,
+                                  endTime: shift.end_time,
+                                  duration: shift.duration,
+                                  hourlyRate: shift.hourly_rate ?? RETAILER_HOURLY_RATE,
+                                  status: shift.status,
+                                  isHidden: hidden,
+                                  postingExpiresAt: shift.posting_expires_at ?? null,
+                                  renewedAt: shift.renewed_at ?? null,
+                                  renewalCount: Number(shift.renewal_count ?? 0),
+                                  isExpired: expired,
+                                  hasHiredWorker: hired,
+                                  isPaid: shift.payment_status === "paid",
+                                }}
+                              />
+                            </div>
+                          }
+                          actions={
+                            <a
+                              className={buttonClass("ghost", { small: true })}
+                              href={`/retailer/applicants?shift=${shift.id}`}
+                            >
+                              View applicants
+                            </a>
+                          }
+                        />
+                      );
+                    })}
                   </ShiftGrid>
                 )}
               </Panel>
