@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reconcileUserAccountServer } from "@/lib/auth/reconcile-server";
 import { sendRetailerWelcomeEmail, sendWorkerWelcomeEmail } from "@/lib/email/server";
 import { getSiteUrl } from "@/lib/site";
 import {
@@ -99,16 +100,8 @@ async function provisionWorker(input: {
 }) {
   const admin = createAdminClient();
 
-  // Check the identity link first. This makes retries a no-op once the worker
-  // row exists and lets a login safely repair only genuinely missing rows.
-  const { data: existing, error: lookupError } = await admin
-    .from("workers")
-    .select("id")
-    .eq("auth_user_id", input.userId)
-    .maybeSingle();
-  if (lookupError) throw lookupError;
-  if (existing) return;
-
+  // Always ensure the profile row exists first, even if the worker row was
+  // already created on a previous attempt or repaired by another code path.
   const { error: profileError } = await admin.from("profiles").upsert(
     {
       id: input.userId,
@@ -122,22 +115,33 @@ async function provisionWorker(input: {
   );
   if (profileError) throw profileError;
 
-  const { error: insertError } = await admin.from("workers").insert({
-    auth_user_id: input.userId,
-    full_name: input.fullName,
-    email: input.email,
-    phone: input.phone,
-  });
-  if (insertError) {
-    // Two retries can race between the lookup and insert. Accept only the
-    // unique-link winner; otherwise surface the actual insert failure.
-    const { data: racedRow, error: retryLookupError } = await admin
-      .from("workers")
-      .select("id")
-      .eq("auth_user_id", input.userId)
-      .maybeSingle();
-    if (retryLookupError) throw retryLookupError;
-    if (!racedRow) throw insertError;
+  // Check the identity link next. This makes retries a no-op once the worker
+  // row exists and lets a login safely repair only genuinely missing rows.
+  const { data: existing, error: lookupError } = await admin
+    .from("workers")
+    .select("id")
+    .eq("auth_user_id", input.userId)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+
+  if (!existing) {
+    const { error: insertError } = await admin.from("workers").insert({
+      auth_user_id: input.userId,
+      full_name: input.fullName,
+      email: input.email,
+      phone: input.phone,
+    });
+    if (insertError) {
+      // Two retries can race between the lookup and insert. Accept only the
+      // unique-link winner; otherwise surface the actual insert failure.
+      const { data: racedRow, error: retryLookupError } = await admin
+        .from("workers")
+        .select("id")
+        .eq("auth_user_id", input.userId)
+        .maybeSingle();
+      if (retryLookupError) throw retryLookupError;
+      if (!racedRow) throw insertError;
+    }
   }
 
   await setRole(input.userId, "worker");
@@ -311,7 +315,14 @@ export async function signUpRetailer(
     email,
     password,
     options: {
-      data: { full_name: fullName, phone, role: "retailer", store_name: storeName },
+      data: {
+        full_name: fullName,
+        phone,
+        role: "retailer",
+        store_name: storeName,
+        store_address: storeAddress,
+        store_phone: storePhone,
+      },
       emailRedirectTo: `${siteUrl}/auth/callback?next=/retailer/dashboard`,
     },
   });
@@ -396,19 +407,40 @@ async function signIn(
 
   if (profileError) {
     console.error("[signIn] profile lookup failed", profileError);
-    // Local scope only: this clears the cookie for THIS browser. A global
-    // sign-out would revoke the refresh token behind every other session this
-    // person has, logging them out of tabs and devices that were working fine.
-    await supabase.auth.signOut({ scope: "local" });
-    return {
-      error: "We couldn't load your account profile. Please try again or contact support.",
-      values,
-    };
   }
 
-  const role = (profile?.role as UserRole | undefined) ?? null;
+  let role = (profile?.role as UserRole | undefined) ?? null;
+
+  // Reconcile the authenticated account against profiles, workers, store_users,
+  // super_admins, app_metadata, and user_metadata. This repairs any missing
+  // profile, worker, or retailer store row for existing accounts so an already
+  // registered user is never falsely told "This account isn't set up yet. Please sign up first."
+  let isSuperAdmin = false;
+  try {
+    const reconciled = await reconcileUserAccountServer(data.user, {
+      fallbackFullName: profile?.full_name ?? (data.user.user_metadata?.full_name as string | undefined) ?? null,
+      fallbackPhone: profile?.phone ?? (data.user.user_metadata?.phone as string | undefined) ?? null,
+    });
+    if (reconciled.role) {
+      role = reconciled.role;
+    }
+    isSuperAdmin = reconciled.isSuperAdmin;
+  } catch (err) {
+    console.error("[signIn] account reconciliation failed", err);
+    if (!role && profileError) {
+      await supabase.auth.signOut({ scope: "local" });
+      return {
+        error: "We couldn't load your account profile. Please try again or contact support.",
+        values,
+      };
+    }
+  }
 
   if (!role) {
+    if (isSuperAdmin) {
+      revalidatePath("/super-admin", "layout");
+      redirect("/super-admin");
+    }
     await supabase.auth.signOut({ scope: "local" });
     return { error: "This account isn't set up yet. Please sign up first.", values };
   }
@@ -615,31 +647,46 @@ export async function updatePassword(
   revalidatePath("/", "layout");
   return {
     success: "Your password has been updated.",
-    redirectTo: await continuePathFor(supabase, userData.user.id),
+    redirectTo: await continuePathFor(supabase, userData.user),
   };
 }
 
 /**
- * Where the success screen sends the user. Read-only: it looks at the records
- * signup already created and changes nothing.
+ * Where the success screen sends the user after a password reset.
+ * Also reconciles any missing profile/worker/retailer records so clicking
+ * "Continue" goes straight to their dashboard without bouncing to a login error.
  */
 async function continuePathFor(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
+  user: {
+    id: string;
+    email?: string | null;
+    app_metadata?: Record<string, unknown> | null;
+    user_metadata?: Record<string, unknown> | null;
+  },
 ): Promise<string> {
+  try {
+    const reconciled = await reconcileUserAccountServer(user);
+    if (reconciled.role === "retailer") return "/retailer/dashboard";
+    if (reconciled.role === "worker") return "/worker/dashboard";
+    if (reconciled.isSuperAdmin) return "/super-admin";
+  } catch (err) {
+    console.error("[continuePathFor] reconciliation fallback:", err);
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", userId)
+    .eq("id", user.id)
     .maybeSingle();
   if (profile?.role === "retailer") return "/retailer/dashboard";
 
   const { data: worker } = await supabase
     .from("workers")
     .select("id")
-    .eq("auth_user_id", userId)
+    .eq("auth_user_id", user.id)
     .maybeSingle();
-  if (worker) return "/worker/dashboard";
+  if (worker || profile?.role === "worker") return "/worker/dashboard";
 
   // Neither a worker nor a retailer — an operations (Super Admin) login, which
   // signs in through its own page and keeps its own authorisation checks.

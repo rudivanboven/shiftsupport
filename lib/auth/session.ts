@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
+import { reconcileUserAccountServer } from "@/lib/auth/reconcile-server";
 import type {
   Profile,
   PublicWorker,
@@ -77,6 +78,10 @@ export const getUser = cache(async (): Promise<User | null> => {
 /**
  * The user's role, read from the `profiles` table — never from client state
  * and never from a value the user is able to edit.
+ *
+ * If an authenticated user's profile row is missing or drifted from their
+ * provisioned worker/store_users/auth metadata records, reconciles it on the
+ * server so an existing user is never treated as unprovisioned.
  */
 export const getProfile = cache(async (): Promise<Profile | null> => {
   const user = await getUser();
@@ -90,10 +95,24 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Unable to load your account profile: ${error.message}`);
+    console.error("[getProfile] RLS profile query failed, attempting server reconciliation:", error.message);
   }
 
-  return (data as Profile) ?? null;
+  const existing = (data as Profile | null) ?? null;
+  if (existing && existing.role) {
+    return existing;
+  }
+
+  try {
+    const reconciled = await reconcileUserAccountServer(user);
+    return reconciled.profile ?? existing;
+  } catch (reconcileError) {
+    if (error) {
+      throw new Error(`Unable to load your account profile: ${error.message}`);
+    }
+    console.error("[getProfile] Account reconciliation failed:", reconcileError);
+    return existing;
+  }
 });
 
 /**
@@ -173,15 +192,27 @@ export async function requireWorker(): Promise<WorkerAccount> {
   const account = await getCurrentUserWithRole();
   if (!account) redirect("/worker/login");
 
-  const { user, profile } = account;
+  const { user } = account;
+  let { profile, role } = account;
+
+  if (!profile || !role) {
+    try {
+      const reconciled = await reconcileUserAccountServer(user);
+      profile = reconciled.profile;
+      role = reconciled.role;
+    } catch (err) {
+      console.error("[requireWorker] reconciliation failed:", err);
+    }
+  }
+
   if (!profile) redirect("/worker/login?error=missing_profile");
   // A retailer never renders a worker page — they go to their own dashboard.
-  if (account.role !== "worker") redirect(account.dashboardPath ?? "/retailer/dashboard");
+  if (role !== "worker") redirect(account.dashboardPath ?? dashboardPathFor(role));
 
   const supabase = await createClient();
   // `workers` has column-level privileges (phone/email are protected), so the
   // readable columns are listed explicitly rather than using `*`.
-  const { data: worker, error: workerError } = await supabase
+  let { data: worker, error: workerError } = await supabase
     .from("workers")
     .select("id,auth_user_id,memberstack_id,full_name,created_at")
     .eq("auth_user_id", user.id)
@@ -189,6 +220,15 @@ export async function requireWorker(): Promise<WorkerAccount> {
 
   if (workerError) {
     throw new Error(`Unable to load your worker account: ${workerError.message}`);
+  }
+
+  if (!worker) {
+    try {
+      const reconciled = await reconcileUserAccountServer(user);
+      worker = reconciled.worker;
+    } catch (err) {
+      console.error("[requireWorker] worker repair failed:", err);
+    }
   }
 
   if (!worker) redirect("/worker/login?error=missing_worker");
@@ -204,13 +244,25 @@ export async function requireRetailer(): Promise<RetailerAccount> {
   const account = await getCurrentUserWithRole();
   if (!account) redirect("/retailer/login");
 
-  const { user, profile } = account;
+  const { user } = account;
+  let { profile, role } = account;
+
+  if (!profile || !role) {
+    try {
+      const reconciled = await reconcileUserAccountServer(user);
+      profile = reconciled.profile;
+      role = reconciled.role;
+    } catch (err) {
+      console.error("[requireRetailer] reconciliation failed:", err);
+    }
+  }
+
   if (!profile) redirect("/retailer/login?error=missing_profile");
   // A worker never renders a retailer page — they go to their own dashboard.
-  if (account.role !== "retailer") redirect(account.dashboardPath ?? "/worker/dashboard");
+  if (role !== "retailer") redirect(account.dashboardPath ?? dashboardPathFor(role));
 
   const supabase = await createClient();
-  const { data: storeUser, error: storeUserError } = await supabase
+  let { data: storeUser, error: storeUserError } = await supabase
     .from("store_users")
     .select("*")
     .eq("auth_user_id", user.id)
@@ -218,6 +270,15 @@ export async function requireRetailer(): Promise<RetailerAccount> {
 
   if (storeUserError) {
     throw new Error(`Unable to load your retailer account: ${storeUserError.message}`);
+  }
+
+  if (!storeUser) {
+    try {
+      const reconciled = await reconcileUserAccountServer(user);
+      storeUser = reconciled.storeUser;
+    } catch (err) {
+      console.error("[requireRetailer] store_users repair failed:", err);
+    }
   }
 
   if (!storeUser) redirect("/retailer/login?error=missing_store");
@@ -228,7 +289,16 @@ export async function requireRetailer(): Promise<RetailerAccount> {
   if (storeError) {
     throw new Error(`Unable to load your store: ${storeError.message}`);
   }
-  const store = (stores as Store[] | null)?.[0];
+  let store = (stores as Store[] | null)?.[0] ?? null;
+
+  if (!store) {
+    try {
+      const reconciled = await reconcileUserAccountServer(user);
+      store = reconciled.store;
+    } catch (err) {
+      console.error("[requireRetailer] store repair failed:", err);
+    }
+  }
 
   if (!store) redirect("/retailer/login?error=missing_store");
 

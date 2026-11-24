@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import AuthLayout from "@/components/auth/AuthLayout";
 import {
   Alert,
@@ -20,19 +21,26 @@ export const metadata: Metadata = {
  * The branded email links here with `?token_hash=…&type=recovery`. The token
  * is NOT verified on load — only when the new password is submitted — so link
  * scanners that open the URL ahead of the user cannot spend it. Older links go
- * through /auth/callback first and arrive here with a session instead.
+ * through /auth/callback first (or arrive with `?code=…`) and arrive here with
+ * a session instead.
  */
 export default async function ResetPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token_hash?: string; type?: string; error_code?: string }>;
+  searchParams: Promise<{ token_hash?: string; type?: string; code?: string; error?: string; error_code?: string }>;
 }) {
   const params = await searchParams;
+  const hasError = Boolean(params.error || params.error_code);
+
+  if (params.code && !hasError) {
+    redirect(`/auth/callback?code=${encodeURIComponent(params.code)}&next=/reset-password`);
+  }
+
   const tokenHash =
-    params.type === "recovery" && params.token_hash && !params.error_code
+    (!params.type || params.type === "recovery") && params.token_hash && !hasError
       ? params.token_hash
       : undefined;
-  const user = tokenHash ? null : await getUser();
+  const user = tokenHash || hasError ? null : await getUser();
   const canReset = Boolean(tokenHash || user);
 
   return (
