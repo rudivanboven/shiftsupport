@@ -52,10 +52,10 @@ const workerFlow = (freeMode: boolean): readonly (readonly [string, string])[] =
 const RETAILER_FLOW = [
   ["Create a shift", "Set the date, hours, location and tasks in Post a Shift."],
   ["See the estimate", "The estimated cost updates from the shift duration as you fill it in."],
-  ["Complete checkout", "Payment is completed before the shift is published."],
-  ["Shift published", "Eligible local workers can see and apply for the shift."],
+  ["Publish immediately", "Your shift goes live to eligible local workers as soon as you post it."],
+  ["Receive applications", "Eligible local workers can see and apply for the shift."],
   ["Hire and complete", "Pick your worker, and the shift is confirmed once it is worked."],
-  ["Shift record", "The completed shift keeps a summary of the shift and payment."],
+  ["Retailer invoice", "ShiftSupport issues an invoice based on actual approved hours worked."],
 ] as const;
 
 function FlowSteps({ steps }: { steps: readonly (readonly [string, string])[] }) {
@@ -380,8 +380,8 @@ export default function PricingPayments({
                 title="One fixed rate for every shift"
                 points={[
                   `The fixed retailer rate is ${formatMoney(RETAILER_HOURLY_RATE)}/hour.`,
-                  "Shift cost is calculated from the shift duration.",
-                  "Payment is required before the shift is published.",
+                  "Shifts are published immediately without upfront checkout.",
+                  "Retailers are invoiced after shift completion for actual approved hours.",
                 ]}
               />
             </section>

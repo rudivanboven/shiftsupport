@@ -11,6 +11,7 @@ import {
   occurrenceDates,
   seriesEndDate,
 } from "@/lib/recurrence";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { type FieldErrors, type FormState, str } from "@/lib/validation";
 
@@ -94,11 +95,10 @@ export async function createShift(
   const resolved = await resolveStoreId();
   if ("error" in resolved) return { error: resolved.error, values };
 
-  const supabase = await createClient();
-  // Created as a draft: a shift is not a marketplace shift until it has been
-  // paid for. The database enforces the same thing — the insert trigger in
-  // migration 0007 pins a session-created shift to `draft` / `unpaid`.
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  // Published directly as `open` without a Stripe checkout step.
+  const { error } = await admin
     .from("shifts")
     .insert({
       store_id: resolved.storeId,
@@ -109,8 +109,9 @@ export async function createShift(
       end_time: end,
       duration,
       hourly_rate: pricing.hourlyRate,
-      status: "draft",
-      payment_status: "unpaid",
+      status: "open",
+      payment_status: "legacy",
+      published_at: now,
       created_by: resolved.userId,
     })
     .select("id")
@@ -131,13 +132,10 @@ export async function createShift(
 
   revalidatePath("/retailer/dashboard");
   revalidatePath("/retailer/shifts");
+  revalidatePath("/worker/available-shifts");
+  revalidatePath("/worker/dashboard");
 
-  const shiftId = (data as { id: string }).id;
-
-  // Take the retailer to the payment review page, but do not create or open a
-  // Stripe Checkout session here. Checkout starts only from that page's
-  // explicit "Continue to payment" button.
-  redirect(`/retailer/shifts/${shiftId}/payment`);
+  redirect("/retailer/shifts");
 }
 
 /**
@@ -245,10 +243,12 @@ async function createRecurringShift(formData: FormData): Promise<FormState> {
   }
 
   const seriesId = (series as { id: string }).id;
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
 
-  // Drafts, like every new shift: the payment trigger from migration 0007
-  // pins a session-created shift to `draft` / `unpaid` regardless.
-  const { error: shiftsError } = await supabase.from("shifts").insert(
+  // Publish every date in the series immediately as `open` without requiring
+  // per-date Stripe Checkout payments.
+  const { error: shiftsError } = await admin.from("shifts").insert(
     occurrences.map(({ day, slot }) => ({
       store_id: resolved.storeId,
       task_type: taskType,
@@ -258,8 +258,9 @@ async function createRecurringShift(formData: FormData): Promise<FormState> {
       end_time: `${slot.endDate}T${endTime}:00`,
       duration: slot.hours,
       hourly_rate: priceShift(slot.hours).hourlyRate,
-      status: "draft",
-      payment_status: "unpaid",
+      status: "open",
+      payment_status: "legacy",
+      published_at: now,
       created_by: resolved.userId,
       series_id: seriesId,
       occurrence_date: day,
@@ -280,9 +281,9 @@ async function createRecurringShift(formData: FormData): Promise<FormState> {
 
   revalidatePath("/retailer/dashboard");
   revalidatePath("/retailer/shifts");
+  revalidatePath("/worker/available-shifts");
+  revalidatePath("/worker/dashboard");
 
-  // The series page lists every date with its own "Pay & publish" button. No
-  // Checkout session is created here.
   redirect(`/retailer/shifts/series/${seriesId}`);
 }
 

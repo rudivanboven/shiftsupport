@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Badge, EmptyState, PageHeader, Panel } from "@/components/ui/Kit";
+import { GenerateOrManageInvoiceActions } from "@/components/super-admin/InvoiceActions";
 import {
   FilterBar,
   Metric,
@@ -24,6 +25,7 @@ import { PAYMENT_STATUS, SHIFT_STATUS, STAGE_LABELS, STAGE_TONES } from "@/lib/a
 import { requireSuperAdmin } from "@/lib/admin/auth";
 import { isOpenShift, loadSnapshot, payrollStage, workerContact } from "@/lib/admin/snapshot";
 import { loadSeriesIndex } from "@/lib/admin/series";
+import { loadAllInvoicesSafe } from "@/lib/invoices/server";
 import { describeDays } from "@/lib/recurrence";
 import { formatDate, formatTime } from "@/lib/format";
 import { RETAILER_HOURLY_RATE } from "@/lib/pricing";
@@ -60,7 +62,11 @@ export default async function ShiftOperationsPage({
   // Shift dates are store wall-clock times, so the date filter is off by
   // default — operations usually want every shift, not a window.
   const range = parseRange(params, "all");
-  const [snapshot, seriesIndex] = await Promise.all([loadSnapshot(), loadSeriesIndex()]);
+  const [snapshot, seriesIndex, { byShiftId: invoiceByShiftId }] = await Promise.all([
+    loadSnapshot(),
+    loadSeriesIndex(),
+    loadAllInvoicesSafe(),
+  ]);
 
   const q = searchText(params.q);
   const status = (params.status ?? "any") as StatusFilter;
@@ -207,6 +213,7 @@ export default async function ShiftOperationsPage({
                     <SortHeader path={PATH} params={params} column="applicants" label="Apps" numeric />
                     <th>Hired worker</th>
                     <th>Payroll</th>
+                    <th>Invoice</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -219,6 +226,11 @@ export default async function ShiftOperationsPage({
                     const payment = PAYMENT_STATUS[shift.payment_status];
                     const applicants = snapshot.applicationsByShift.get(shift.id) ?? [];
                     const series = seriesIndex.get(shift.id);
+                    const existingInvoice = invoiceByShiftId.get(shift.id) ?? null;
+                    const invoiceEligible =
+                      shift.status === "completed" &&
+                      entry?.approval_status === "approved" &&
+                      Boolean(entry.approved_hours && entry.approved_hours > 0);
 
                     return (
                       <tr key={shift.id}>
@@ -274,6 +286,31 @@ export default async function ShiftOperationsPage({
                         </td>
                         <td>
                           <Badge tone={STAGE_TONES[stage]}>{STAGE_LABELS[stage]}</Badge>
+                        </td>
+                        <td>
+                          {shift.status === "completed" || existingInvoice ? (
+                            <GenerateOrManageInvoiceActions
+                              shiftId={shift.id}
+                              eligible={invoiceEligible}
+                              ineligibleReason="Approve hours first"
+                              compact
+                              existingInvoice={
+                                existingInvoice
+                                  ? {
+                                      id: existingInvoice.id,
+                                      invoiceNumber: existingInvoice.invoiceNumber,
+                                      invoiceStatus: existingInvoice.invoiceStatus,
+                                      emailStatus: existingInvoice.emailStatus,
+                                      emailSentAt: existingInvoice.emailSentAt,
+                                      emailSendCount: existingInvoice.emailSendCount,
+                                      contactEmail: existingInvoice.contactEmail,
+                                    }
+                                  : null
+                              }
+                            />
+                          ) : (
+                            <span className={styles.sub}>—</span>
+                          )}
                         </td>
                       </tr>
                     );

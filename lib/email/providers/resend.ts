@@ -4,6 +4,7 @@ const RESEND_EMAILS_URL = "https://api.resend.com/emails";
 
 export interface ResendProviderOptions {
   apiKey?: string;
+  apiUrl?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -13,12 +14,22 @@ export function createResendProvider(
 ): EmailProvider {
   const apiKey = (options.apiKey ?? process.env.RESEND_API_KEY ?? "").trim();
   if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
+  const apiUrl = (options.apiUrl ?? process.env.RESEND_API_URL ?? RESEND_EMAILS_URL).trim();
   const fetchImpl = options.fetchImpl ?? fetch;
 
   return {
     id: "resend",
     async send(message: OutboundEmail & { from: string }): Promise<EmailSendResult> {
-      const response = await fetchImpl(RESEND_EMAILS_URL, {
+      const attachments =
+        message.attachments && message.attachments.length > 0
+          ? message.attachments.map((att) => ({
+              filename: att.filename,
+              content: att.content,
+              ...(att.contentType ? { content_type: att.contentType } : {}),
+            }))
+          : undefined;
+
+      const response = await fetchImpl(apiUrl, {
         method: "POST",
         headers: {
           ...message.headers,
@@ -32,6 +43,7 @@ export function createResendProvider(
           text: message.text,
           ...(message.html ? { html: message.html } : {}),
           ...(message.replyTo ? { reply_to: message.replyTo } : {}),
+          ...(attachments ? { attachments } : {}),
         }),
       });
 

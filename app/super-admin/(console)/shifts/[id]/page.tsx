@@ -5,14 +5,17 @@ import type { ReactNode } from "react";
 
 import { Badge, EmptyState, PageHeader, Panel } from "@/components/ui/Kit";
 import ContactActions from "@/components/super-admin/ContactActions";
+import { GenerateOrManageInvoiceActions } from "@/components/super-admin/InvoiceActions";
 import { RecordHoursForm, ReviewHoursForm } from "@/components/super-admin/forms";
 import { DefinitionList, Metric, Metrics, Notice, hours as hoursText, money } from "@/components/super-admin/ui";
 import { contactLinks } from "@/lib/admin/contact";
 import { wallClockNow } from "@/lib/admin/dates";
 import { APPLICATION_STATUS, PAYMENT_STATUS, SHIFT_STATUS, STAGE_HELP, STAGE_LABELS, STAGE_TONES } from "@/lib/admin/labels";
 import { requireSuperAdmin } from "@/lib/admin/auth";
-import { loadSnapshot, payrollStage, workerContact } from "@/lib/admin/snapshot";
+import { loadSnapshot, payrollStage, retailerContact, workerContact } from "@/lib/admin/snapshot";
 import { loadSeriesIndex } from "@/lib/admin/series";
+import { validateShiftForInvoice } from "@/lib/invoices/core";
+import { createSupabaseInvoiceRepository } from "@/lib/invoices/server";
 import { clockTime, describeDays } from "@/lib/recurrence";
 import { formatDate, formatDateTime, formatTime } from "@/lib/format";
 import { PLATFORM_HOURLY_PORTION, RETAILER_HOURLY_RATE, WORKER_HOURLY_RATE } from "@/lib/pricing";
@@ -48,12 +51,18 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
   await requireSuperAdmin();
 
   const { id } = await params;
-  const [snapshot, seriesIndex] = await Promise.all([loadSnapshot(), loadSeriesIndex()]);
+  const invoiceRepo = createSupabaseInvoiceRepository();
+  const [snapshot, seriesIndex, existingInvoice] = await Promise.all([
+    loadSnapshot(),
+    loadSeriesIndex(),
+    invoiceRepo.getInvoiceByShiftId(id),
+  ]);
   const shift = snapshot.shiftById.get(id);
   if (!shift) notFound();
   const series = seriesIndex.get(shift.id);
 
   const store = snapshot.storeById.get(shift.store_id);
+  const storeContact = retailerContact(snapshot, shift.store_id);
   const payment = snapshot.paymentByShift.get(shift.id);
   const entry = snapshot.entryByShift.get(shift.id);
   const applications = (snapshot.applicationsByShift.get(shift.id) ?? []).slice().sort((a, b) => a.applied_at.localeCompare(b.applied_at));
@@ -61,6 +70,49 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
   const worker = shift.accepted_by ? snapshot.workerById.get(shift.accepted_by) : undefined;
   const workerInfo = worker ? workerContact(snapshot, worker) : null;
   const stage = payrollStage(shift, entry);
+
+  const invoiceValidation = validateShiftForInvoice({
+    shift: {
+      id: shift.id,
+      storeId: shift.store_id,
+      taskType: shift.task_type,
+      shiftLocation: shift.shift_location,
+      startTime: shift.start_time,
+      endTime: shift.end_time,
+      scheduledDuration: shift.duration,
+      hourlyRate: shift.hourly_rate,
+      status: shift.status,
+      acceptedBy: shift.accepted_by,
+      completedAt: shift.completed_at,
+    },
+    store: store
+      ? {
+          id: store.id,
+          name: store.name,
+          address: store.address,
+          contactPhone: store.contact_phone,
+        }
+      : null,
+    retailerContact: {
+      userId: storeContact.owner?.auth_user_id ?? null,
+      name: storeContact.name,
+      email: storeContact.email,
+      phone: storeContact.phone ?? store?.contact_phone ?? null,
+    },
+    workers:
+      entry || worker
+        ? [
+            {
+              workerId: entry?.worker_id ?? worker?.id ?? "",
+              workerName: workerInfo?.name ?? worker?.full_name ?? null,
+              timeEntryId: entry?.id ?? null,
+              approvalStatus: entry?.approval_status ?? null,
+              approvedHours: entry?.approved_hours ?? null,
+              reportedHours: entry?.reported_hours ?? null,
+            },
+          ]
+        : [],
+  });
 
   const scheduled = shift.duration;
   const approved = entry?.approved_hours ?? null;
@@ -330,7 +382,91 @@ export default async function ShiftDetailPage({ params }: { params: Promise<{ id
           )}
         </Panel>
 
-        <Panel title="Payment record" description="From `shift_payments` — written only by Stripe-verified fulfilment.">
+        <Panel
+          title="Retailer invoice"
+          description="Generate, preview, download and email the PDF invoice for this completed shift."
+          action={{ href: "/super-admin/invoices", label: "All invoices" }}
+        >
+          {existingInvoice ? (
+            <div className={styles.stack}>
+              <DefinitionList
+                items={[
+                  [
+                    "Invoice number",
+                    <Link
+                      key="inv"
+                      className={styles.primaryCell}
+                      href={`/super-admin/invoices/${existingInvoice.id}`}
+                    >
+                      #{existingInvoice.invoiceNumber}
+                    </Link>,
+                  ],
+                  ["Retailer / store", existingInvoice.storeName],
+                  ["Retailer email", existingInvoice.contactEmail ?? "—"],
+                  ["Approved hours billed", hoursText(existingInvoice.approvedHours)],
+                  ["Hourly billing rate", `$${existingInvoice.hourlyRate}/hour`],
+                  [
+                    "Total invoice amount",
+                    `${money(existingInvoice.totalCents)} ${existingInvoice.currency}`,
+                  ],
+                  ["Invoice status", existingInvoice.invoiceStatus.toUpperCase()],
+                  [
+                    "Email delivery status",
+                    existingInvoice.emailStatus === "sent"
+                      ? `Sent ${
+                          existingInvoice.emailSentAt
+                            ? formatDateTime(existingInvoice.emailSentAt)
+                            : ""
+                        }`
+                      : existingInvoice.emailStatus,
+                  ],
+                ]}
+              />
+              <GenerateOrManageInvoiceActions
+                shiftId={shift.id}
+                eligible
+                existingInvoice={{
+                  id: existingInvoice.id,
+                  invoiceNumber: existingInvoice.invoiceNumber,
+                  invoiceStatus: existingInvoice.invoiceStatus,
+                  emailStatus: existingInvoice.emailStatus,
+                  emailSentAt: existingInvoice.emailSentAt,
+                  emailSendCount: existingInvoice.emailSendCount,
+                  contactEmail: existingInvoice.contactEmail,
+                }}
+              />
+            </div>
+          ) : invoiceValidation.eligible ? (
+            <div className={styles.stack}>
+              <DefinitionList
+                items={[
+                  ["Retailer / store", invoiceValidation.storeName],
+                  ["Retailer email", invoiceValidation.contactEmail ?? "—"],
+                  ["Worker", invoiceValidation.lineItems.map((l) => l.workerName).join(", ")],
+                  ["Approved hours worked", hoursText(invoiceValidation.approvedHours)],
+                  ["Applicable hourly billing rate", `$${invoiceValidation.hourlyRate}/hour`],
+                  [
+                    "Calculated invoice total",
+                    `${money(invoiceValidation.totalCents)} ${invoiceValidation.currency}`,
+                  ],
+                ]}
+              />
+              <GenerateOrManageInvoiceActions
+                shiftId={shift.id}
+                eligible
+              />
+            </div>
+          ) : (
+            <Notice>
+              <p>
+                <strong>Not eligible for invoice generation yet:</strong>{" "}
+                {invoiceValidation.reason}
+              </p>
+            </Notice>
+          )}
+        </Panel>
+
+        <Panel title="Payment record" description="Historical payment from `shift_payments` (if paid prior to Stripe retirement).">
           {payment ? (
             <DefinitionList
               items={[

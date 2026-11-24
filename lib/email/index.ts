@@ -9,6 +9,13 @@ import { createResendProvider } from "./providers/resend";
  * email independently and never handles Auth SMTP or reset links.
  */
 
+export interface EmailAttachment {
+  filename: string;
+  /** Base64-encoded file content. */
+  content: string;
+  contentType?: string;
+}
+
 export interface OutboundEmail {
   to: string;
   subject: string;
@@ -16,6 +23,7 @@ export interface OutboundEmail {
   html?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  attachments?: EmailAttachment[];
 }
 
 export interface EmailSendResult {

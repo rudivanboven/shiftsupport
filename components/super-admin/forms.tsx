@@ -8,6 +8,8 @@ import {
   reviewShiftHoursAction,
   setPayrollStatusAction,
   setWorkerPayrollIdAction,
+  submitPayrollToAdpAction,
+  verifyAdpConnectionAction,
   revokeSuperAdminAction,
 } from "@/app/actions/super-admin";
 import { Alert, FormGrid, FormRow, Input, SubmitButton, Textarea } from "@/components/ui/Form";
@@ -262,6 +264,62 @@ export function PayrollStatusForm({
       <SubmitButton small variant={status === "error" ? "danger" : "ghost"} pendingLabel="Updating…" disabled={shiftIds.length === 0}>
         {label}
         {shiftIds.length ? ` (${shiftIds.length})` : ""}
+      </SubmitButton>
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------ ADP integration */
+
+export function AdpConnectionForm({ connected }: { connected: boolean }) {
+  const [state, action] = useActionState<FormState, FormData>(
+    verifyAdpConnectionAction,
+    {},
+  );
+
+  return (
+    <form action={action} className={styles.inlineForm}>
+      {state.error ? <Alert tone="error">{state.error}</Alert> : null}
+      {state.success ? <Alert tone="success">{state.success}</Alert> : null}
+      <SubmitButton
+        small
+        variant={connected ? "ghost" : "primary"}
+        pendingLabel="Checking ADP configuration…"
+      >
+        {connected ? "Verify ADP Payroll Connection" : "Connect ADP Payroll"}
+      </SubmitButton>
+    </form>
+  );
+}
+
+export function AdpSubmitBatchForm({
+  shiftIds,
+  connected,
+  unmappedCount,
+}: {
+  shiftIds: string[];
+  connected: boolean;
+  unmappedCount: number;
+}) {
+  const [state, action] = useActionState<FormState, FormData>(
+    submitPayrollToAdpAction,
+    {},
+  );
+
+  return (
+    <form action={action} className={styles.inlineForm}>
+      {state.error ? <Alert tone="error">{state.error}</Alert> : null}
+      {state.success ? <Alert tone="success">{state.success}</Alert> : null}
+      {shiftIds.map((id) => (
+        <input key={id} type="hidden" name="shiftId" value={id} />
+      ))}
+      <SubmitButton
+        small
+        variant="primary"
+        pendingLabel="Submitting to ADP…"
+        disabled={!connected || shiftIds.length === 0 || unmappedCount > 0}
+      >
+        Submit approved hours to ADP ({shiftIds.length})
       </SubmitButton>
     </form>
   );

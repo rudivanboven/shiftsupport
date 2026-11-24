@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Badge, EmptyState, PageHeader, Panel } from "@/components/ui/Kit";
-import { PayrollStatusForm } from "@/components/super-admin/forms";
+import {
+  AdpConnectionForm,
+  AdpSubmitBatchForm,
+  PayrollStatusForm,
+} from "@/components/super-admin/forms";
 import {
   FilterBar,
   Metric,
@@ -22,6 +26,7 @@ import { STAGE_HELP, STAGE_LABELS, STAGE_TONES } from "@/lib/admin/labels";
 import { requireSuperAdmin } from "@/lib/admin/auth";
 import { loadSnapshot, payrollStage, workerContact, type PayrollStage } from "@/lib/admin/snapshot";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { inspectAdpConfiguration } from "@/lib/payroll";
 import { WORKER_HOURLY_RATE } from "@/lib/pricing";
 import styles from "@/components/super-admin/Admin.module.css";
 
@@ -94,6 +99,15 @@ export default async function PayrollPage({
   const exportedRows = filtered.filter((r) => r.stage === "exported");
   const submittedRows = filtered.filter((r) => r.stage === "submitted");
   const approvedHoursTotal = rowsAll.reduce((sum, r) => sum + r.approved, 0);
+  const adpStatus = inspectAdpConfiguration();
+  const payrollIdMap = new Map(
+    snapshot.payrollIds
+      .filter((p) => p.provider === "adp")
+      .map((p) => [p.worker_id, p.external_employee_id]),
+  );
+  const unmappedReadyRows = readyRows.filter(
+    (r) => !r.worker || !payrollIdMap.get(r.worker.id),
+  );
 
   const storeOptions = [
     { value: "", label: "All stores" },
@@ -152,6 +166,49 @@ export default async function PayrollPage({
         />
         <SelectFilter name="store" label="Store" value={params.store} options={storeOptions} />
       </FilterBar>
+
+      <Panel
+        title="ADP Payroll Integration"
+        description="Direct API connection for submitting approved worker timesheets to ADP."
+      >
+        <div className={styles.stack}>
+          <div className={styles.headerRow}>
+            <Badge tone={adpStatus.connected ? "approved" : "pending"}>
+              {adpStatus.connected
+                ? `Connected · ADP ${adpStatus.product}`
+                : "Not connected · Awaiting ADP API credentials"}
+            </Badge>
+            {adpStatus.companyCode ? (
+              <span className={styles.sub}>Company code: {adpStatus.companyCode}</span>
+            ) : null}
+          </div>
+
+          {adpStatus.connected ? (
+            <p className={styles.metricHint}>
+              ADP Payroll API is connected. {readyRows.length} approved shift line
+              {readyRows.length === 1 ? " is" : "s are"} ready for submission
+              {unmappedReadyRows.length > 0
+                ? ` (${unmappedReadyRows.length} missing worker ADP employee ID mapping)`
+                : ""}.
+            </p>
+          ) : (
+            <p className={styles.metricHint}>
+              Live ADP API submission requires client credentials and an mTLS client certificate from ADP Security Services. Until configured on the server, no fake API submission is performed — use the verified CSV export below to upload approved hours into ADP.
+            </p>
+          )}
+
+          <div className={styles.btnRow}>
+            <AdpConnectionForm connected={adpStatus.connected} />
+            <AdpSubmitBatchForm
+              shiftIds={readyRows.map((r) => r.shift.id)}
+              connected={adpStatus.connected}
+              unmappedCount={unmappedReadyRows.length}
+            />
+          </div>
+        </div>
+      </Panel>
+
+      <div className={styles.spacer} aria-hidden="true" />
 
       <div className={styles.detailGrid}>
         <Panel title="Export approved hours" description="An interim manual workflow — a CSV an operator uploads or keys into ADP. This is an export, not an ADP API integration.">

@@ -18,27 +18,13 @@ import { formatDate, formatDuration, formatMoney, formatTime, isPast } from "@/l
 import { priceShift, RETAILER_HOURLY_RATE } from "@/lib/pricing";
 import { clockTime, describeDays } from "@/lib/recurrence";
 import CancelShiftButton from "../../ShiftActions";
-import PayShiftButton from "../../[id]/payment/PayShiftButton";
-import { SERIES_STATUS_LABEL, summariseSeries } from "../seriesSummary";
+import { SERIES_STATUS_LABEL } from "../seriesSummary";
 import styles from "../series.module.css";
 
 export const metadata: Metadata = { title: "Recurring shift | ShiftSupport" };
 
-const PAYMENT_LABEL: Record<string, string> = {
-  paid: "Paid",
-  legacy: "No online payment",
-  pending: "Confirming payment",
-  failed: "Payment failed",
-  unpaid: "Unpaid",
-};
-
 /**
  * One recurring series: its schedule, the worker it keeps, and every date.
- *
- * Each date is an ordinary shift with its own payment, so this page reuses
- * the existing per-shift "Pay & publish" button and receipt page. The totals
- * here add up per-date prices for planning; nothing is charged from this page
- * except through that same per-date checkout.
  */
 export default async function SeriesDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { store } = await requireRetailer();
@@ -47,7 +33,6 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ i
   const series = await getSeriesDetail(id, store.id);
   if (!series) notFound();
 
-  const summary = summariseSeries(series);
   const bookedIds = series.occurrences.filter((s) => s.accepted_by).map((s) => s.id);
   const [keptWorkerName, contacts] = await Promise.all([
     getWorkerName(series.assigned_worker_id),
@@ -57,16 +42,9 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ i
   const scheduled = series.occurrences.filter((s) => s.status !== "cancelled");
   const priceOf = (hours: number) => priceShift(Number(hours) || 0).retailerTotal;
   const scheduledTotal = scheduled.reduce((sum, s) => sum + priceOf(s.duration), 0);
-  const paidTotal =
-    scheduled
-      .filter((s) => s.payment_status === "paid")
-      .reduce((sum, s) => sum + (s.amount_paid_cents ?? 0), 0) / 100;
-  const unpaid = scheduled.filter((s) => s.status === "draft");
-  const unpaidTotal = unpaid.reduce((sum, s) => sum + priceOf(s.duration), 0);
 
   const sample = series.occurrences[0];
   const hoursPerDate = sample ? Number(sample.duration) || 0 : 0;
-  const nextToPay = summary.awaitingPayment[0] ?? null;
 
   return (
     <>
@@ -82,27 +60,6 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ i
       />
 
       <div className={styles.stack}>
-        {nextToPay ? (
-          <Panel title="Publish your dates">
-            <div className={styles.callout}>
-              <p className={styles.calloutText}>
-                {summary.awaitingPayment.length} upcoming date
-                {summary.awaitingPayment.length === 1 ? " is" : "s are"} saved as{" "}
-                {summary.awaitingPayment.length === 1 ? "a draft" : "drafts"}. Each date is paid
-                for separately through the usual secure checkout, and is published to workers —
-                or booked straight onto your recurring worker — once its payment is confirmed.
-                Nothing is charged automatically.
-              </p>
-              <div className={styles.calloutActions}>
-                <PayShiftButton
-                  shiftId={nextToPay.id}
-                  label={`Pay & publish ${formatDate(nextToPay.start_time)}`}
-                />
-              </div>
-            </div>
-          </Panel>
-        ) : null}
-
         <div className={styles.columns}>
           <Panel title="Schedule">
             <MetaList>
@@ -158,33 +115,23 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ i
                   {formatMoney(priceOf(hoursPerDate))}
                 </dd>
               </div>
-              <div>
+              <div className={styles.pricingTotal}>
                 <dt>
                   {scheduled.length} scheduled date{scheduled.length === 1 ? "" : "s"}
                 </dt>
                 <dd>{formatMoney(scheduledTotal)}</dd>
               </div>
-              <div>
-                <dt>Paid so far</dt>
-                <dd>{formatMoney(paidTotal)}</dd>
-              </div>
-              <div className={styles.pricingTotal}>
-                <dt>
-                  Still to pay ({unpaid.length} date{unpaid.length === 1 ? "" : "s"})
-                </dt>
-                <dd>{formatMoney(unpaidTotal)}</dd>
-              </div>
             </dl>
             <p className={styles.pricingNote}>
-              Planning figures only. You pay for each date individually when you publish it;
-              there is no subscription and no automatic charge.
+              Estimated figures based on scheduled duration. Each completed shift is invoiced
+              based on actual approved hours worked.
             </p>
           </Panel>
         </div>
 
         <Panel
           title="Dates"
-          description="Each date can be paid for, cancelled or reviewed on its own without affecting the rest of the series."
+          description="Each date can be managed, cancelled or reviewed on its own without affecting the rest of the series."
           flush
         >
           <ul className={styles.dates}>
@@ -209,8 +156,7 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ i
                     <p className={styles.dateTitle}>{formatDate(shift.start_time)}</p>
                     <p className={styles.dateMeta}>
                       {formatTime(shift.start_time)} – {formatTime(shift.end_time)} ·{" "}
-                      {formatMoney(priceOf(shift.duration))} ·{" "}
-                      {PAYMENT_LABEL[shift.payment_status ?? "unpaid"] ?? shift.payment_status}
+                      {formatMoney(priceOf(shift.duration))}
                     </p>
                     {shift.accepted_by ? (
                       <p className={styles.dateWorker}>
@@ -232,14 +178,6 @@ export default async function SeriesDetailPage({ params }: { params: Promise<{ i
                       {statusLabel}
                     </Badge>
                     <div className={styles.dateActions}>
-                      {shift.status === "draft" && !past ? (
-                        <PayShiftButton
-                          shiftId={shift.id}
-                          label="Pay & publish"
-                          variant="primary"
-                          small
-                        />
-                      ) : null}
                       {shift.status === "open" && !shift.accepted_by ? (
                         <a
                           className={buttonClass("ghost", { small: true })}

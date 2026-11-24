@@ -173,25 +173,16 @@ export default async function RetailerDashboardPage() {
                         accent={shift.status === "open" ? "green" : "muted"}
                         badge={
                           shift.status === "draft"
-                            ? { tone: "pending", label: "Awaiting payment" }
+                            ? { tone: "neutral", label: "Draft" }
                             : undefined
                         }
                         actions={
-                          shift.status === "draft" ? (
-                            <a
-                              className={buttonClass("primary", { small: true })}
-                              href={`/retailer/shifts/${shift.id}/payment`}
-                            >
-                              Complete payment
-                            </a>
-                          ) : (
-                            <a
-                              className={buttonClass("ghost", { small: true })}
-                              href={`/retailer/applicants?shift=${shift.id}`}
-                            >
-                              View applicants
-                            </a>
-                          )
+                          <a
+                            className={buttonClass("ghost", { small: true })}
+                            href={`/retailer/applicants?shift=${shift.id}`}
+                          >
+                            View applicants
+                          </a>
                         }
                       />
                     ))}

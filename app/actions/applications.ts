@@ -57,9 +57,6 @@ export async function applyForShift(shiftId: string): Promise<Result> {
   if (!shift) return fail("That shift is no longer available.");
   if (shift.accepted_by) return fail("Someone has already been hired for this shift.");
   if (shift.status !== "open") return fail("This shift is no longer open for applications.");
-  if (shift.payment_status && !["paid", "legacy"].includes(shift.payment_status)) {
-    return fail("This shift isn't live yet.");
-  }
 
   const application = {
     shift_id: shiftId,

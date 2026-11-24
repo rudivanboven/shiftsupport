@@ -17,19 +17,15 @@ import { isPast } from "@/lib/format";
 import type { Shift } from "@/lib/supabase/types";
 import ShiftReviewBlock from "@/components/reviews/ShiftReviewBlock";
 import CancelShiftButton from "./ShiftActions";
-import PayShiftButton from "./[id]/payment/PayShiftButton";
 import SeriesOverview from "./series/SeriesOverview";
 
 export const metadata: Metadata = { title: "My shifts | ShiftSupport" };
 
-type Filter = "all" | "unpaid" | "open" | "filled" | "past";
+type Filter = "all" | "open" | "filled" | "past";
 
 const matches = (shift: Shift, filter: Filter) => {
   const past = isPast(shift.end_time);
   switch (filter) {
-    case "unpaid":
-      // Created but not paid for yet, so not visible to workers.
-      return shift.status === "draft";
     case "open":
       return shift.status === "open" && !shift.accepted_by && !past;
     case "filled":
@@ -48,7 +44,7 @@ export default async function RetailerShiftsPage({
 }) {
   const { store } = await requireRetailer();
   const params = await searchParams;
-  const filter: Filter = (["all", "unpaid", "open", "filled", "past"] as const).includes(
+  const filter: Filter = (["all", "open", "filled", "past"] as const).includes(
     params.filter as Filter,
   )
     ? (params.filter as Filter)
@@ -75,7 +71,6 @@ export default async function RetailerShiftsPage({
   const tabs: TabItem[] = (
     [
       ["all", "All shifts"],
-      ["unpaid", "Awaiting payment"],
       ["open", "Open"],
       ["filled", "Filled"],
       ["past", "Past & cancelled"],
@@ -160,7 +155,7 @@ export default async function RetailerShiftsPage({
                 accent={cancelled || past ? "muted" : shift.accepted_by ? "peach" : "green"}
                 badge={
                   shift.status === "draft"
-                    ? { tone: "pending", label: "Awaiting payment" }
+                    ? { tone: "neutral", label: "Draft" }
                     : cancelled
                     ? { tone: "cancelled", label: "Cancelled" }
                     : shift.status === "completed"
@@ -182,49 +177,27 @@ export default async function RetailerShiftsPage({
                   ) : null
                 }
                 actions={
-                  shift.status === "draft" ? (
-                    <>
-                      <PayShiftButton
+                  <>
+                    <a
+                      className={buttonClass("ghost", { small: true })}
+                      href={`/retailer/applicants?shift=${shift.id}`}
+                    >
+                      Applicants
+                    </a>
+                    <a
+                      className={buttonClass("ghost", { small: true })}
+                      href={`/retailer/shifts/${shift.id}/payment`}
+                    >
+                      {shift.payment_status === "paid" ? "Receipt" : "Shift summary"}
+                    </a>
+                    {seriesLink}
+                    {!cancelled && !past ? (
+                      <CancelShiftButton
                         shiftId={shift.id}
-                        label="Pay & publish"
-                        variant="primary"
-                        small
+                        label={series ? "Cancel this date" : undefined}
                       />
-                      <a
-                        className={buttonClass("ghost", { small: true })}
-                        href={`/retailer/shifts/${shift.id}/payment`}
-                      >
-                        Shift summary
-                      </a>
-                      {seriesLink}
-                      {!cancelled ? <CancelShiftButton
-                          shiftId={shift.id}
-                          label={series ? "Cancel this date" : undefined}
-                        /> : null}
-                    </>
-                  ) : (
-                    <>
-                      <a
-                        className={buttonClass("ghost", { small: true })}
-                        href={`/retailer/applicants?shift=${shift.id}`}
-                      >
-                        Applicants
-                      </a>
-                      <a
-                        className={buttonClass("ghost", { small: true })}
-                        href={`/retailer/shifts/${shift.id}/payment`}
-                      >
-                        {shift.payment_status === "paid" ? "Receipt" : "Shift summary"}
-                      </a>
-                      {seriesLink}
-                      {!cancelled && !past ? (
-                        <CancelShiftButton
-                          shiftId={shift.id}
-                          label={series ? "Cancel this date" : undefined}
-                        />
-                      ) : null}
-                    </>
-                  )
+                    ) : null}
+                  </>
                 }
               />
             );

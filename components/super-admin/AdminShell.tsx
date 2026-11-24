@@ -61,6 +61,7 @@ const SECTIONS = [
   {
     label: "Finance",
     items: [
+      { href: "/super-admin/invoices", label: "Invoices", Icon: IconList },
       { href: "/super-admin/finance", label: "Payments", Icon: IconCash },
       { href: "/super-admin/payroll", label: "Payroll / ADP", Icon: IconClock },
     ],

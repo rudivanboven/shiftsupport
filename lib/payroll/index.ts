@@ -1,19 +1,34 @@
 import "server-only";
 
+import {
+  createAdpPayrollProvider,
+  inspectAdpConfiguration,
+  prepareAdpPayrollBatch,
+  type AdpConnectionStatus,
+  type AdpPreparedBatch,
+} from "./adp";
+
 /**
  * Payroll integration boundary.
  *
- * ShiftSupport does not pay workers: retailers pay ShiftSupport through
- * Stripe, and ADP runs worker payroll, taxes and payment. This app's job is to
- * hand ADP the APPROVED hours for each worker. No bank details, tax details or
- * Stripe Connect payouts live here.
+ * ShiftSupport does not pay workers directly: ADP runs worker payroll, taxes
+ * and payment. This app's job is to hand ADP the APPROVED actual hours worked
+ * for each worker. No bank details or tax details live here.
  *
- * The ADP product, API access, credentials, employee-id mapping and endpoint
- * have NOT been confirmed, so no ADP adapter exists yet. Until one does, the
- * only available method is `manual_csv`: an export an operator uploads or
- * keys into ADP by hand. It is labelled as an export everywhere and is never
- * described as an API integration.
+ * When the client's ADP credentials, mTLS certificate/key, and endpoints are
+ * configured on the server, `getPayrollProvider()` returns the live ADP
+ * adapter. Until those credentials are provided, `inspectAdpConfiguration()`
+ * reports the exact missing requirements and operators can continue to export
+ * approved hours via `payrollCsv` without any fake API status.
  */
+
+export {
+  createAdpPayrollProvider,
+  inspectAdpConfiguration,
+  prepareAdpPayrollBatch,
+  type AdpConnectionStatus,
+  type AdpPreparedBatch,
+};
 
 export interface PayrollLine {
   shiftId: string;
@@ -45,15 +60,17 @@ export interface PayrollProvider {
   submit(lines: PayrollLine[], batchId: string): Promise<PayrollSubmitResult>;
 }
 
-/**
- * Registered automatic providers. Empty on purpose — see the note above.
- * An ADP adapter would be added here once the client confirms the details
- * listed in the Payroll page's "Before automatic ADP submission" panel.
- */
-const PROVIDERS: Record<string, () => PayrollProvider> = {};
+const PROVIDERS: Record<string, () => PayrollProvider> = {
+  adp: () => createAdpPayrollProvider(),
+};
 
 export function getPayrollProvider(): PayrollProvider | null {
-  const id = process.env.PAYROLL_PROVIDER?.trim();
+  const id = (
+    process.env.PAYROLL_PROVIDER ??
+    (process.env.ADP_CLIENT_ID ? "adp" : "")
+  )
+    .trim()
+    .toLowerCase();
   if (!id || id === "manual_csv") return null;
   const factory = PROVIDERS[id];
   if (!factory) {

@@ -109,19 +109,12 @@ export default function PostShiftForm({
           <span className={styles.successIcon}>
             <IconCheck width={28} height={28} />
           </span>
-          <h3 className={styles.successTitle}>Your shift is saved as a draft</h3>
+          <h3 className={styles.successTitle}>Your shift has been published</h3>
           <p className={styles.successText}>
-            Your shift has been saved as a draft. Complete payment to publish it to
-            eligible workers.
+            Your shift is live and visible to eligible local workers.
           </p>
           <div className={styles.successActions}>
-            <a
-              className={buttonClass("primary")}
-              href={`/retailer/shifts/${state.success}/payment`}
-            >
-              Continue to payment
-            </a>
-            <a className={buttonClass("ghost")} href="/retailer/shifts">
+            <a className={buttonClass("primary")} href="/retailer/shifts">
               View my shifts
             </a>
           </div>
@@ -272,7 +265,7 @@ export default function PostShiftForm({
                 label="Schedule for"
                 name="weeks"
                 value={String(weeks)}
-                hint="Each date becomes its own shift that you pay for and publish separately."
+                hint="Each date becomes its own shift in the recurring series."
                 error={state.fieldErrors?.weeks}
                 onChange={(e) => setWeeks(Number(e.target.value))}
               >
@@ -414,8 +407,8 @@ export default function PostShiftForm({
               {formatUsd(series.estimate.total, true)}
             </span>
             <span className={styles.seriesTotalNote}>
-              Shown for planning only. Nothing is charged automatically — each date is
-              paid for separately when you publish it.
+              Shown for planning. Retailers are invoiced for actual approved hours after
+              each shift is completed.
             </span>
           </div>
         ) : null}
@@ -429,12 +422,12 @@ export default function PostShiftForm({
           ) : null}
           <li>Shifts posted a few days ahead attract the most applicants.</li>
           <li>
-            Your shift is published once payment is confirmed. You&apos;ll review it before
-            choosing whether to continue to secure Stripe checkout.
+            Your shift is published immediately to eligible local workers as soon as you
+            post it.
           </li>
           <li>
-            Every shift is charged at the fixed {formatUsd(RETAILER_HOURLY_RATE)}/hr
-            ShiftSupport rate, so there is no rate to negotiate.
+            Every shift is billed at the fixed {formatUsd(RETAILER_HOURLY_RATE)}/hr
+            ShiftSupport rate, and invoiced once the shift is completed.
           </li>
           <li>
             Your store phone number stays private until you hire someone for the shift.

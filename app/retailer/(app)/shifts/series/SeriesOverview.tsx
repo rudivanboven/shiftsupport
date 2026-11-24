@@ -33,9 +33,6 @@ export default function SeriesOverview({ series }: { series: SeriesWithOccurrenc
                   <p className={styles.overviewMeta}>
                     {summary.upcoming.length} upcoming date
                     {summary.upcoming.length === 1 ? "" : "s"}
-                    {summary.awaitingPayment.length
-                      ? ` · ${summary.awaitingPayment.length} awaiting payment`
-                      : ""}
                     {summary.next ? ` · next ${formatDate(summary.next.start_time)}` : ""}
                     {" · "}
                     {item.assigned_worker_id ? "Same worker kept" : "No worker hired yet"}

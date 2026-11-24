@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { syncShiftPayment } from "@/app/actions/billing";
-import { ConfirmingPoller } from "@/components/pricing/MembershipActions";
 import { Badge, MetaList, MetaRow, PageHeader, Panel } from "@/components/ui/Kit";
 import { buttonClass } from "@/components/ui/buttonClass";
 import {
@@ -20,36 +18,27 @@ import { formatDate, formatDuration, formatMoney, formatTime } from "@/lib/forma
 import { priceShift, RETAILER_HOURLY_RATE } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
 import type { Shift } from "@/lib/supabase/types";
-import PayButton from "./PayShiftButton";
 import styles from "./payment.module.css";
 
-export const metadata: Metadata = { title: "Shift payment | ShiftSupport" };
+export const metadata: Metadata = { title: "Shift summary | ShiftSupport" };
 
 const money = (cents: number | null | undefined) =>
   cents === null || cents === undefined ? null : formatMoney(cents / 100);
 
 /**
- * Payment status and receipt for one shift.
+ * Shift summary and historical receipt for one shift.
  *
- * Everything money-related on this page comes from the `shift_payments` row,
- * which is written only by Stripe-verified fulfillment. When there is no
- * confirmed payment yet, the page says so — it never presents an expected
- * amount as if it had been charged.
+ * Stripe Checkout is no longer required to publish shifts. Any historical
+ * payment rows in `shift_payments` remain readable for shifts paid before
+ * Stripe checkout was retired.
  */
 export default async function ShiftPaymentPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ session_id?: string; canceled?: string }>;
 }) {
   const { store } = await requireRetailer();
   const { id } = await params;
-  const query = await searchParams;
-
-  // Coming back from Checkout: ask Stripe what happened. `session_id` only
-  // says which session to look up — Stripe's answer is what counts.
-  if (query.session_id) await syncShiftPayment(id);
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -61,7 +50,6 @@ export default async function ShiftPaymentPage({
     .maybeSingle();
 
   const shift = data as Shift | null;
-  // RLS already limits this to the caller's own store; this is the second lock.
   if (!shift || shift.store_id !== store.id) notFound();
 
   const [{ payment }, seriesByShift] = await Promise.all([
@@ -69,8 +57,6 @@ export default async function ShiftPaymentPage({
     getSeriesForShifts([shift.id]),
   ]);
   const series = seriesByShift.get(shift.id) ?? null;
-  // A recurring date published after the hire goes straight to the kept
-  // worker (migration 0012) instead of to the marketplace.
   const bookedForSeries = Boolean(
     series?.assigned_worker_id && shift.accepted_by === series.assigned_worker_id,
   );
@@ -78,34 +64,29 @@ export default async function ShiftPaymentPage({
   const hours = Number(shift.duration) || 0;
   const expected = priceShift(hours);
   const paid = shift.payment_status === "paid";
-  const legacy = shift.payment_status === "legacy";
   const cancelled = shift.status === "cancelled";
-  const confirming =
-    !paid && (Boolean(query.session_id) || shift.payment_status === "pending");
 
   const statusBadge = paid
-    ? { tone: "approved" as const, label: "Paid" }
-    : legacy
-      ? { tone: "neutral" as const, label: "Published before online payments" }
-      : cancelled
-        ? { tone: "cancelled" as const, label: "Cancelled" }
-        : confirming
-          ? { tone: "pending" as const, label: "Confirming…" }
-          : { tone: "pending" as const, label: "Awaiting payment" };
+    ? { tone: "approved" as const, label: "Paid (historical)" }
+    : cancelled
+      ? { tone: "cancelled" as const, label: "Cancelled" }
+      : shift.status === "completed"
+        ? { tone: "approved" as const, label: "Completed · Invoiced on approved hours" }
+        : { tone: "open" as const, label: "Published · Billed after completion" };
 
   return (
     <>
       <PageHeader
-        eyebrow="Shift payment"
-        title={paid ? shift.task_type : "Your shift is ready for payment"}
+        eyebrow="Shift summary"
+        title={shift.task_type}
         description={
           paid
             ? bookedForSeries
-              ? "This date has been paid for and is booked for your recurring worker."
-              : "This shift has been paid for and is live for workers."
-            : legacy
-              ? "This shift was posted before online payments were introduced."
-              : "Your shift has been saved as a draft. Complete payment to publish it to eligible workers."
+              ? "Historical payment confirmed. This date is booked for your recurring worker."
+              : "Historical payment confirmed for this shift."
+            : cancelled
+              ? "This shift was cancelled."
+              : "Your shift is published to eligible workers. Retailers are invoiced for actual approved hours once the shift is completed."
         }
         actions={
           series ? (
@@ -121,7 +102,7 @@ export default async function ShiftPaymentPage({
       />
 
       <div className={styles.stack}>
-        <Panel title="Payment status">
+        <Panel title="Billing status">
           <div className={styles.status}>
             <Badge tone={statusBadge.tone}>{statusBadge.label}</Badge>
 
@@ -132,33 +113,19 @@ export default async function ShiftPaymentPage({
                   ? " This date is booked for your recurring worker."
                   : " Your shift is published and eligible workers can apply."}
               </p>
-            ) : legacy ? (
-              <p className={styles.statusText}>
-                There is no online payment record for this shift because it predates
-                Stripe checkout. Nothing is owed here.
-              </p>
             ) : cancelled ? (
               <p className={styles.statusText}>
-                This shift was cancelled, so no payment is due and it cannot be published.
+                This shift was cancelled, so no invoice is issued.
               </p>
-            ) : confirming ? (
-              <>
-                <p className={styles.statusText}>
-                  Payment received — we&apos;re confirming it with Stripe. This page
-                  updates itself, and your shift publishes as soon as the payment is
-                  confirmed.
-                </p>
-                <ConfirmingPoller />
-              </>
             ) : (
               <>
                 <p className={styles.statusText}>
-                  {query.canceled
-                    ? "Checkout was cancelled, so nothing was charged and the shift was not published. You can pay for it whenever you're ready."
-                    : "This shift is saved as a draft. Workers can't see it until the payment is complete."}
+                  No upfront payment is required to publish a shift. ShiftSupport issues a
+                  retailer invoice after the shift is completed and actual hours worked are
+                  approved.
                 </p>
                 <p className={styles.statusAmount}>
-                  <span>Amount due</span>
+                  <span>Estimated shift cost</span>
                   <strong>{formatMoney(expected.retailerTotal)}</strong>
                   <small>
                     {formatDuration(hours)} × {formatMoney(RETAILER_HOURLY_RATE)}/hour
@@ -166,12 +133,6 @@ export default async function ShiftPaymentPage({
                 </p>
               </>
             )}
-
-            {!paid && !legacy && !cancelled && !confirming ? (
-              <div className={styles.statusActions}>
-                <PayButton shiftId={shift.id} label="Continue to payment" />
-              </div>
-            ) : null}
           </div>
         </Panel>
 
@@ -191,7 +152,7 @@ export default async function ShiftPaymentPage({
               <MetaRow
                 icon={<IconCalendar width={16} height={16} />}
                 label="Recurring shift"
-                value={`${describeDays(series.days_of_week)} — this date is paid for on its own`}
+                value={describeDays(series.days_of_week)}
               />
             ) : null}
             <MetaRow
@@ -213,17 +174,17 @@ export default async function ShiftPaymentPage({
         </Panel>
 
         <Panel
-          title={paid ? "Receipt" : "Shift summary"}
+          title={paid ? "Receipt" : "Shift cost summary"}
           description={
             paid
-              ? "The amounts Stripe confirmed for this shift."
-              : "What this shift will cost once it is paid for."
+              ? "Historical payment confirmed for this shift."
+              : "Estimated cost based on scheduled shift duration."
           }
         >
           <div className={styles.receipt}>
             <dl className={styles.receiptList}>
               <div>
-                <dt>Shift duration</dt>
+                <dt>Scheduled duration</dt>
                 <dd>{formatDuration(hours)}</dd>
               </div>
               <div>
@@ -231,7 +192,7 @@ export default async function ShiftPaymentPage({
                 <dd>{formatMoney(shift.hourly_rate ?? RETAILER_HOURLY_RATE)}/hour</dd>
               </div>
               <div className={styles.receiptTotal}>
-                <dt>{paid ? "Total paid" : "Total due"}</dt>
+                <dt>{paid ? "Total paid" : "Estimated total"}</dt>
                 <dd>
                   {paid
                     ? money(payment?.amount_cents ?? shift.amount_paid_cents) ?? "—"
@@ -239,7 +200,7 @@ export default async function ShiftPaymentPage({
                 </dd>
               </div>
               <div>
-                <dt>Payment status</dt>
+                <dt>Status</dt>
                 <dd>{statusBadge.label}</dd>
               </div>
               {payment?.paid_at ? (
@@ -248,25 +209,12 @@ export default async function ShiftPaymentPage({
                   <dd>{formatDate(payment.paid_at)}</dd>
                 </div>
               ) : null}
-              {payment?.stripe_payment_intent_id ? (
-                <div>
-                  <dt>Stripe payment</dt>
-                  <dd className={styles.reference}>{payment.stripe_payment_intent_id}</dd>
-                </div>
-              ) : null}
-              {payment?.stripe_checkout_session_id ? (
-                <div>
-                  <dt>Checkout session</dt>
-                  <dd className={styles.reference}>
-                    {payment.stripe_checkout_session_id}
-                  </dd>
-                </div>
-              ) : null}
             </dl>
 
             {!paid ? (
               <p className={styles.receiptNote}>
-                Amounts shown here are what this shift will cost — nothing has been charged yet.
+                Final retailer invoice amount is calculated from actual approved hours worked
+                after the shift is completed.
               </p>
             ) : null}
           </div>
