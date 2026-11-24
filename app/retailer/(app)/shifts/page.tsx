@@ -137,7 +137,7 @@ export default async function RetailerShiftsPage({
           />
         </Panel>
       ) : (
-        <ShiftGrid>
+        <ShiftGrid fullWidth>
           {visible.map((shift) => {
             const past = isPast(shift.end_time);
             const expired = isShiftPostingExpired(shift);
@@ -180,6 +180,7 @@ export default async function RetailerShiftsPage({
             return (
               <ShiftCard
                 key={shift.id}
+                fullWidth
                 shift={shift}
                 storeAddress={store.address}
                 applicantCount={counts.get(shift.id) ?? { pending: 0, total: 0 }}
@@ -207,29 +208,28 @@ export default async function RetailerShiftsPage({
                 }
                 footer={
                   <>
-                    <div style={{ padding: "0 20px 18px" }}>
-                      <RetailerShiftManagementActions
-                        shift={{
-                          id: shift.id,
-                          storeName: store.name,
-                          taskType: shift.task_type,
-                          description: shift.description,
-                          shiftLocation: shift.shift_location ?? store.address ?? "",
-                          startTime: shift.start_time,
-                          endTime: shift.end_time,
-                          duration: shift.duration,
-                          hourlyRate: shift.hourly_rate ?? RETAILER_HOURLY_RATE,
-                          status: shift.status,
-                          isHidden: hidden,
-                          postingExpiresAt: shift.posting_expires_at ?? null,
-                          renewedAt: shift.renewed_at ?? null,
-                          renewalCount: Number(shift.renewal_count ?? 0),
-                          isExpired: expired,
-                          hasHiredWorker: hired,
-                          isPaid: shift.payment_status === "paid",
-                        }}
-                      />
-                    </div>
+                    <RetailerShiftManagementActions
+                      fullWidth
+                      shift={{
+                        id: shift.id,
+                        storeName: store.name,
+                        taskType: shift.task_type,
+                        description: shift.description,
+                        shiftLocation: shift.shift_location ?? store.address ?? "",
+                        startTime: shift.start_time,
+                        endTime: shift.end_time,
+                        duration: shift.duration,
+                        hourlyRate: shift.hourly_rate ?? RETAILER_HOURLY_RATE,
+                        status: shift.status,
+                        isHidden: hidden,
+                        postingExpiresAt: shift.posting_expires_at ?? null,
+                        renewedAt: shift.renewed_at ?? null,
+                        renewalCount: Number(shift.renewal_count ?? 0),
+                        isExpired: expired,
+                        hasHiredWorker: hired,
+                        isPaid: shift.payment_status === "paid",
+                      }}
+                    />
                     {hired && past && !cancelled ? (
                       <ShiftReviewBlock
                         shiftId={shift.id}

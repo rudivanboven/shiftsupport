@@ -24,8 +24,16 @@ import { clockTime, describeDays } from "@/lib/recurrence";
 import type { SeriesInfo, Shift, StoreContact } from "@/lib/supabase/types";
 import styles from "./ShiftCard.module.css";
 
-export const ShiftGrid = ({ children }: { children: ReactNode }) => (
-  <div className={styles.grid}>{children}</div>
+export const ShiftGrid = ({
+  children,
+  fullWidth = false,
+}: {
+  children: ReactNode;
+  fullWidth?: boolean;
+}) => (
+  <div className={`${styles.grid} ${fullWidth ? styles.gridFullWidth : ""}`}>
+    {children}
+  </div>
 );
 
 function NoticeIcon() {
@@ -87,6 +95,12 @@ interface ShiftCardProps {
    * on worker cards so the two are easy to tell apart.
    */
   series?: SeriesInfo | null;
+  /**
+   * When true, renders the card in a full-width single-column vertical layout
+   * with every information field stacked one row below another (used on the
+   * Retailer "My Shifts" management dashboard).
+   */
+  fullWidth?: boolean;
 }
 
 export default function ShiftCard({
@@ -102,6 +116,7 @@ export default function ShiftCard({
   footer,
   accent = "green",
   series,
+  fullWidth = false,
 }: ShiftCardProps) {
   const status = shift.status ?? "open";
   const resolvedBadge = badge ?? {
@@ -121,10 +136,10 @@ export default function ShiftCard({
         : "";
 
   return (
-    <article className={styles.card}>
+    <article className={`${styles.card} ${fullWidth ? styles.cardFullWidth : ""}`}>
       <div className={`${styles.accent} ${accentClass}`} />
 
-      <div className={styles.head}>
+      <div className={`${styles.head} ${fullWidth ? styles.headFullWidth : ""}`}>
         <div className={styles.headText}>
           <h3 className={styles.title}>{shift.task_type}</h3>
           {storeName ? (
@@ -132,6 +147,9 @@ export default function ShiftCard({
               <IconStore width={14} height={14} />
               {storeName}
             </p>
+          ) : null}
+          {fullWidth && shift.description ? (
+            <p className={styles.descriptionFullWidth}>{shift.description}</p>
           ) : null}
         </div>
         <Badge tone={resolvedBadge.tone}>{resolvedBadge.label}</Badge>
@@ -151,53 +169,53 @@ export default function ShiftCard({
         </p>
       ) : null}
 
-      {shift.description ? (
+      {!fullWidth && shift.description ? (
         <p className={styles.description}>{shift.description}</p>
       ) : null}
 
       {location ? (
-        <div className={styles.location}>
+        <div className={`${styles.location} ${fullWidth ? styles.locationFullWidth : ""}`}>
           <IconPin width={17} height={17} />
-          <span>
+          <span className={styles.locationBody}>
             <span className={styles.locationLabel}>Shift location</span>
             <span className={styles.locationValue}>{location}</span>
           </span>
         </div>
       ) : null}
 
-      <div className={styles.meta}>
-        <div className={styles.metaCell}>
-          <IconCalendar width={16} height={16} className={styles.metaIcon} />
-          <span>
+      <div className={`${styles.meta} ${fullWidth ? styles.metaVertical : ""}`}>
+        <div className={`${styles.metaCell} ${fullWidth ? styles.metaRowVertical : ""}`}>
+          <span className={styles.metaCellLabelWrap}>
+            <IconCalendar width={16} height={16} className={styles.metaIcon} />
             <span className={styles.metaLabel}>Date</span>
-            <span className={styles.metaValue}>{formatDate(shift.start_time)}</span>
           </span>
+          <span className={styles.metaValue}>{formatDate(shift.start_time)}</span>
         </div>
 
-        <div className={styles.metaCell}>
-          <IconClock width={16} height={16} className={styles.metaIcon} />
-          <span>
+        <div className={`${styles.metaCell} ${fullWidth ? styles.metaRowVertical : ""}`}>
+          <span className={styles.metaCellLabelWrap}>
+            <IconClock width={16} height={16} className={styles.metaIcon} />
             <span className={styles.metaLabel}>Time</span>
-            <span className={styles.metaValue}>
-              {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
-            </span>
+          </span>
+          <span className={styles.metaValue}>
+            {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
           </span>
         </div>
 
-        <div className={styles.metaCell}>
-          <IconPin width={16} height={16} className={styles.metaIcon} />
-          <span>
+        <div className={`${styles.metaCell} ${fullWidth ? styles.metaRowVertical : ""}`}>
+          <span className={styles.metaCellLabelWrap}>
+            <IconClock width={16} height={16} className={styles.metaIcon} />
             <span className={styles.metaLabel}>Duration</span>
-            <span className={styles.metaValue}>{formatDuration(shift.duration)}</span>
           </span>
+          <span className={styles.metaValue}>{formatDuration(shift.duration)}</span>
         </div>
 
-        <div className={styles.metaCell}>
-          <IconCash width={16} height={16} className={styles.metaIcon} />
-          <span>
-            <span className={styles.metaLabel}>{workerView ? "Gross rate" : "Rate"}</span>
-            <span className={styles.metaValue}>{formatRate(displayedRate)}</span>
+        <div className={`${styles.metaCell} ${fullWidth ? styles.metaRowVertical : ""}`}>
+          <span className={styles.metaCellLabelWrap}>
+            <IconCash width={16} height={16} className={styles.metaIcon} />
+            <span className={styles.metaLabel}>{workerView ? "Gross rate" : "Hourly rate"}</span>
           </span>
+          <span className={styles.metaValue}>{formatRate(displayedRate)}</span>
         </div>
       </div>
 
@@ -248,8 +266,8 @@ export default function ShiftCard({
         </div>
       ) : null}
 
-      <div className={styles.foot}>
-        <div className={styles.total}>
+      <div className={`${styles.foot} ${fullWidth ? styles.footFullWidth : ""}`}>
+        <div className={`${styles.total} ${fullWidth ? styles.totalFullWidth : ""}`}>
           <span className={styles.totalIcon} aria-hidden="true">
             {currencySymbol()}
           </span>
@@ -267,7 +285,36 @@ export default function ShiftCard({
           </span>
         </div>
 
-        {applicantCount || actions ? (
+        {fullWidth ? (
+          <>
+            {applicantCount ? (
+              <div className={styles.infoRowFullWidth}>
+                <span className={styles.infoRowLabel}>
+                  <IconUsers width={16} height={16} className={styles.metaIcon} />
+                  <span>Applicants</span>
+                </span>
+                <span
+                  className={`${styles.applicants} ${
+                    applicantCount.pending > 0 ? styles.applicantsHot : ""
+                  }`}
+                >
+                  <IconUsers width={14} height={14} />
+                  {applicantCount.total === 0
+                    ? "No applicants"
+                    : `${applicantCount.total} applicant${applicantCount.total === 1 ? "" : "s"}`}
+                  {applicantCount.pending > 0 ? ` · ${applicantCount.pending} new` : ""}
+                </span>
+              </div>
+            ) : null}
+
+            {actions ? (
+              <div className={styles.actionsRowFullWidth}>
+                <span className={styles.infoRowLabel}>Quick views</span>
+                <div className={styles.actionsGroupFullWidth}>{actions}</div>
+              </div>
+            ) : null}
+          </>
+        ) : applicantCount || actions ? (
           <div className={styles.footRow}>
             {applicantCount ? (
               <span

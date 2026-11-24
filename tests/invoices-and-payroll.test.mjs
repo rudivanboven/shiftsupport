@@ -1017,3 +1017,62 @@ test("16. Retailer & Super Admin Shift Management: Hide, Show, Delete, Renew, Ex
   assert.match(migration0019, /revoke delete on public\.shifts from anon, authenticated/);
   assert.match(migration0019, /create or replace function public\.worker_can_view_series/);
 });
+
+test("17. Retailer My Shifts page redesign: two-column card grid on desktop with vertical single-column rows inside each card", async () => {
+  const [retailerShiftsPage, shiftCardComponent, shiftCardCss, retailerShiftActions] =
+    await Promise.all([
+      readFile(new URL("../app/retailer/(app)/shifts/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../components/shifts/ShiftCard.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../components/shifts/ShiftCard.module.css", import.meta.url), "utf8"),
+      readFile(new URL("../app/retailer/(app)/shifts/ShiftActions.tsx", import.meta.url), "utf8"),
+    ]);
+
+  // 1. Retailer My Shifts page uses fullWidth ShiftGrid, ShiftCard, and RetailerShiftManagementActions
+  assert.match(retailerShiftsPage, /<ShiftGrid\s+fullWidth>/);
+  assert.match(retailerShiftsPage, /<ShiftCard[\s\S]*?fullWidth/);
+  assert.match(retailerShiftsPage, /<RetailerShiftManagementActions[\s\S]*?fullWidth/);
+
+  // 2. ShiftCard.module.css defines 2-column grid on desktop (collapsing to 1 column on <= 860px) and vertical meta stack inside each card
+  assert.match(
+    shiftCardCss,
+    /\.gridFullWidth\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  );
+  assert.match(
+    shiftCardCss,
+    /@media\s*\(max-width:\s*860px\)\s*\{[\s\S]*?\.gridFullWidth\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+  );
+  assert.match(shiftCardCss, /\.cardFullWidth\s*\{[\s\S]*?width:\s*100%/);
+  assert.match(shiftCardCss, /\.metaVertical\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(shiftCardCss, /\.metaRowVertical/);
+  assert.match(shiftCardCss, /\.totalFullWidth/);
+  assert.match(shiftCardCss, /\.infoRowFullWidth/);
+  assert.match(shiftCardCss, /\.actionsRowFullWidth/);
+
+  // 3. Required vertical information order inside ShiftCard + RetailerShiftManagementActions
+  const titleIdx = shiftCardComponent.indexOf("styles.headFullWidth");
+  const locationIdx = shiftCardComponent.indexOf("styles.locationFullWidth");
+  const dateIdx = shiftCardComponent.indexOf(">Date<");
+  const timeIdx = shiftCardComponent.indexOf(">Time<");
+  const durationIdx = shiftCardComponent.indexOf(">Duration<");
+  const rateIdx = shiftCardComponent.indexOf('"Hourly rate"');
+  const totalIdx = shiftCardComponent.indexOf("styles.totalFullWidth");
+  const applicantsIdx = shiftCardComponent.indexOf("styles.infoRowFullWidth");
+  const actionsIdx = shiftCardComponent.indexOf("styles.actionsRowFullWidth");
+  const footerIdx = shiftCardComponent.lastIndexOf("{footer}");
+
+  assert.ok(titleIdx > -1);
+  assert.ok(locationIdx > titleIdx);
+  assert.ok(dateIdx > locationIdx);
+  assert.ok(timeIdx > dateIdx);
+  assert.ok(durationIdx > timeIdx);
+  assert.ok(rateIdx > durationIdx);
+  assert.ok(totalIdx > rateIdx);
+  assert.ok(applicantsIdx > totalIdx);
+  assert.ok(actionsIdx > applicantsIdx);
+  assert.ok(footerIdx > actionsIdx);
+
+  // 4. Inside RetailerShiftManagementActions (rendered in {footer}), Posting Expiry comes before Shift Management actions
+  const expiryIdx = retailerShiftActions.indexOf("Posting Expiry");
+  const manageIdx = retailerShiftActions.indexOf("Shift Management");
+  assert.ok(expiryIdx > -1 && manageIdx > expiryIdx);
+});

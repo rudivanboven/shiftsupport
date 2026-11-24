@@ -37,6 +37,7 @@ const TASK_SUGGESTIONS = [
 type ActivePanel = "none" | "edit" | "extend" | "renew" | "delete";
 
 export interface RetailerShiftManagementProps {
+  fullWidth?: boolean;
   shift: {
     id: string;
     storeName: string;
@@ -81,7 +82,10 @@ function defaultRenewalDate(currentDate: string): string {
   return currentDate > tomorrow ? currentDate : tomorrow;
 }
 
-export function RetailerShiftManagementActions({ shift }: RetailerShiftManagementProps) {
+export function RetailerShiftManagementActions({
+  shift,
+  fullWidth = false,
+}: RetailerShiftManagementProps) {
   const router = useRouter();
   const [activePanel, setActivePanel] = useState<ActivePanel>("none");
   const [banner, setBanner] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -206,115 +210,228 @@ export function RetailerShiftManagementActions({ shift }: RetailerShiftManagemen
 
   return (
     <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        width: "100%",
-        paddingTop: 12,
-        marginTop: 4,
-        borderTop: "1px dashed var(--line)",
-      }}
+      style={
+        fullWidth
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              width: "100%",
+            }
+          : {
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              width: "100%",
+              paddingTop: 12,
+              marginTop: 4,
+              borderTop: "1px dashed var(--line)",
+            }
+      }
     >
-      {/* Posting Visibility & Renewal Metadata Bar */}
+      {/* Row 10: Posting Expiry Information */}
       <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "6px 12px",
-          fontSize: 12,
-          color: "var(--muted)",
-          fontFamily: "var(--font-heading)",
-        }}
+        style={
+          fullWidth
+            ? {
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "8px 16px",
+                width: "100%",
+                padding: "13px 24px",
+                borderBottom: "1px solid var(--line)",
+                background: "var(--surface)",
+                fontFamily: "var(--font-heading)",
+              }
+            : {
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "6px 12px",
+                fontSize: 12,
+                color: "var(--muted)",
+                fontFamily: "var(--font-heading)",
+              }
+        }
       >
-        <span>
-          <strong>Posting Expiry:</strong>{" "}
-          {shift.postingExpiresAt
-            ? `${formatDate(shift.postingExpiresAt)} · ${formatTime(shift.postingExpiresAt)}`
-            : `${formatDate(shift.endTime)} · ${formatTime(shift.endTime)} (shift end)`}
+        <span
+          style={
+            fullWidth
+              ? {
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.09em",
+                  textTransform: "uppercase",
+                  color: "var(--muted)",
+                }
+              : undefined
+          }
+        >
+          <strong>Posting Expiry</strong>
+          {!fullWidth ? ": " : null}
+          {!fullWidth
+            ? shift.postingExpiresAt
+              ? `${formatDate(shift.postingExpiresAt)} · ${formatTime(shift.postingExpiresAt)}`
+              : `${formatDate(shift.endTime)} · ${formatTime(shift.endTime)} (shift end)`
+            : null}
         </span>
-        {shift.renewalCount > 0 ? (
-          <span style={{ color: "var(--brand-green)", fontWeight: 600 }}>
-            Renewed {shift.renewalCount}x
+
+        <span
+          style={{
+            display: "inline-flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 10,
+            fontSize: fullWidth ? 13.5 : 12,
+            fontWeight: 600,
+            color: "var(--ink)",
+          }}
+        >
+          {fullWidth ? (
+            <span>
+              {shift.postingExpiresAt
+                ? `${formatDate(shift.postingExpiresAt)} · ${formatTime(shift.postingExpiresAt)}`
+                : `${formatDate(shift.endTime)} · ${formatTime(shift.endTime)} (shift end)`}
+            </span>
+          ) : null}
+          {shift.renewalCount > 0 ? (
+            <span style={{ color: "var(--brand-green)", fontWeight: 600 }}>
+              Renewed {shift.renewalCount}x
+            </span>
+          ) : null}
+        </span>
+      </div>
+
+      {/* Row 11: Shift Management Actions */}
+      <div
+        style={
+          fullWidth
+            ? {
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px 16px",
+                width: "100%",
+                padding: "14px 24px",
+                background: "rgba(22, 48, 36, 0.025)",
+              }
+            : {
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 8,
+              }
+        }
+      >
+        {fullWidth ? (
+          <span
+            style={{
+              fontFamily: "var(--font-heading)",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.09em",
+              textTransform: "uppercase",
+              color: "var(--muted)",
+            }}
+          >
+            Shift Management
           </span>
         ) : null}
-      </div>
 
-      {/* Six Separate Retailer Management Action Buttons */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        {/* 1. Edit Shift */}
-        {canEdit ? (
-          <button
-            type="button"
-            onClick={() => togglePanel("edit")}
-            className={buttonClass(activePanel === "edit" ? "primary" : "ghost", { small: true })}
-          >
-            {activePanel === "edit" ? "Close Edit" : "Edit Shift"}
-          </button>
-        ) : null}
-
-        {/* 2. Extend Date / Time */}
-        {canExtend ? (
-          <button
-            type="button"
-            onClick={() => togglePanel("extend")}
-            className={buttonClass(activePanel === "extend" ? "primary" : "ghost", {
-              small: true,
-            })}
-          >
-            {activePanel === "extend" ? "Close Extend" : "Extend Date / Time"}
-          </button>
-        ) : null}
-
-        {/* 3. Renew Shift */}
-        {canRenew ? (
-          <button
-            type="button"
-            onClick={() => togglePanel("renew")}
-            className={buttonClass(
-              activePanel === "renew" || shift.isExpired || isDeleted
-                ? "primary"
-                : "ghost",
-              { small: true },
-            )}
-          >
-            {activePanel === "renew" ? "Close Renew" : "Renew Shift"}
-          </button>
-        ) : null}
-
-        {/* 4 & 5. Hide Shift / Show Shift */}
-        {canHideOrShow ? (
-          <form action={visibilityAction} style={{ display: "inline-flex" }}>
-            <input type="hidden" name="shiftId" value={shift.id} />
-            <input type="hidden" name="isHidden" value={shift.isHidden ? "false" : "true"} />
-            <button type="submit" className={buttonClass("ghost", { small: true })}>
-              {shift.isHidden ? "Show Shift" : "Hide Shift"}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          {/* 1. Edit Shift */}
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => togglePanel("edit")}
+              className={buttonClass(activePanel === "edit" ? "primary" : "ghost", { small: true })}
+            >
+              {activePanel === "edit" ? "Close Edit" : "Edit Shift"}
             </button>
-          </form>
-        ) : null}
+          ) : null}
 
-        {/* 6. Delete Shift */}
-        {!isDeleted ? (
-          <button
-            type="button"
-            onClick={() => togglePanel("delete")}
-            className={buttonClass("danger", { small: true })}
-          >
-            {activePanel === "delete" ? "Close Delete" : "Delete Shift"}
-          </button>
-        ) : null}
+          {/* 2. Extend Date / Time */}
+          {canExtend ? (
+            <button
+              type="button"
+              onClick={() => togglePanel("extend")}
+              className={buttonClass(activePanel === "extend" ? "primary" : "ghost", {
+                small: true,
+              })}
+            >
+              {activePanel === "extend" ? "Close Extend" : "Extend Date / Time"}
+            </button>
+          ) : null}
+
+          {/* 3. Renew Shift */}
+          {canRenew ? (
+            <button
+              type="button"
+              onClick={() => togglePanel("renew")}
+              className={buttonClass(
+                activePanel === "renew" || shift.isExpired || isDeleted
+                  ? "primary"
+                  : "ghost",
+                { small: true },
+              )}
+            >
+              {activePanel === "renew" ? "Close Renew" : "Renew Shift"}
+            </button>
+          ) : null}
+
+          {/* 4 & 5. Hide Shift / Show Shift */}
+          {canHideOrShow ? (
+            <form action={visibilityAction} style={{ display: "inline-flex" }}>
+              <input type="hidden" name="shiftId" value={shift.id} />
+              <input type="hidden" name="isHidden" value={shift.isHidden ? "false" : "true"} />
+              <button type="submit" className={buttonClass("ghost", { small: true })}>
+                {shift.isHidden ? "Show Shift" : "Hide Shift"}
+              </button>
+            </form>
+          ) : null}
+
+          {/* 6. Delete Shift */}
+          {!isDeleted ? (
+            <button
+              type="button"
+              onClick={() => togglePanel("delete")}
+              className={buttonClass("danger", { small: true })}
+            >
+              {activePanel === "delete" ? "Close Delete" : "Delete Shift"}
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {banner ? <Alert tone={banner.tone}>{banner.text}</Alert> : null}
+      {banner || activePanel !== "none" ? (
+        <div
+          style={
+            fullWidth
+              ? {
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  padding: "0 24px 18px",
+                  background: "rgba(22, 48, 36, 0.025)",
+                }
+              : {
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }
+          }
+        >
+          {banner ? <Alert tone={banner.tone}>{banner.text}</Alert> : null}
 
       {/* ─── Panel 1: Edit Shift ─── */}
       {activePanel === "edit" && canEdit ? (
@@ -759,6 +876,8 @@ export function RetailerShiftManagementActions({ shift }: RetailerShiftManagemen
               </FormGrid>
             </form>
           )}
+        </div>
+      ) : null}
         </div>
       ) : null}
     </div>
