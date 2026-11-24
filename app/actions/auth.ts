@@ -260,7 +260,10 @@ export async function signUpWorker(
   try {
     const result = await sendWorkerWelcomeEmail({ userId: data.user.id, email, siteUrl });
     if (result.status === "failed") {
-      console.error("[signUpWorker] welcome email failed", result.reason ?? "unknown error");
+      console.error(
+        "[signUpWorker] welcome email failed",
+        result.error ?? result.reason ?? "unknown error",
+      );
     }
   } catch (err) {
     console.error("[signUpWorker] welcome email failed", err);
@@ -347,7 +350,10 @@ export async function signUpRetailer(
       siteUrl,
     });
     if (result.status === "failed") {
-      console.error("[signUpRetailer] welcome email failed", result.reason ?? "unknown error");
+      console.error(
+        "[signUpRetailer] welcome email failed",
+        result.error ?? result.reason ?? "unknown error",
+      );
     }
   } catch (err) {
     console.error("[signUpRetailer] welcome email failed", err);

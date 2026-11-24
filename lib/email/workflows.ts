@@ -18,11 +18,42 @@ export interface EmailTemplateSet {
 }
 
 const DEFAULT_SITE_URL = "http://localhost:3000";
+const PRODUCTION_SITE_URL_FALLBACK = "https://shiftsupport.net";
+
+function isLocalhostUrl(value: string): boolean {
+  const clean = value.trim().toLowerCase();
+  return (
+    clean.includes("://localhost") ||
+    clean.includes("://127.0.0.1") ||
+    clean.includes("://[::1]") ||
+    clean.startsWith("localhost") ||
+    clean.startsWith("127.0.0.1")
+  );
+}
 
 function defaultNormaliseSiteUrl(siteUrl?: string | null): string {
-  const raw = (siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).trim();
-  if (!raw) return DEFAULT_SITE_URL;
-  return raw.replace(/\/+$/, "");
+  const isProdEnv =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production";
+
+  const candidate = (siteUrl ?? process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
+
+  if (candidate && !(isProdEnv && isLocalhostUrl(candidate))) {
+    return candidate.replace(/\/+$/, "");
+  }
+
+  if (isProdEnv) {
+    const vercelProd = (process.env.VERCEL_PROJECT_PRODUCTION_URL ?? "").trim();
+    if (vercelProd && !isLocalhostUrl(vercelProd)) {
+      const withProto = vercelProd.startsWith("http")
+        ? vercelProd
+        : `https://${vercelProd}`;
+      return withProto.replace(/\/+$/, "");
+    }
+    return PRODUCTION_SITE_URL_FALLBACK;
+  }
+
+  return (candidate || DEFAULT_SITE_URL).replace(/\/+$/, "");
 }
 
 export function escapeHtml(value: string): string {

@@ -128,7 +128,7 @@ export async function createShift(
     };
   }
 
-  void markRetailerFirstShiftPosted(resolved.storeId);
+  await markRetailerFirstShiftPosted(resolved.storeId);
 
   revalidatePath("/retailer/dashboard");
   revalidatePath("/retailer/shifts");
@@ -277,7 +277,7 @@ async function createRecurringShift(formData: FormData): Promise<FormState> {
     return { error: "We couldn't create that recurring shift. Please try again.", values };
   }
 
-  void markRetailerFirstShiftPosted(resolved.storeId);
+  await markRetailerFirstShiftPosted(resolved.storeId);
 
   revalidatePath("/retailer/dashboard");
   revalidatePath("/retailer/shifts");

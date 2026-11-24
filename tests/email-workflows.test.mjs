@@ -11,6 +11,7 @@ import {
   executeRetailerReminderJob,
   executeRetailerWelcomeEmail,
   executeWorkerWelcomeEmail,
+  normaliseSiteUrl,
   resolveGreetingFirstName,
   RETAILER_REMINDER_INTERVAL_MS,
 } from "../lib/email/workflows.ts";
@@ -620,8 +621,15 @@ test("12. Source integration: auth signup, shift creation, cron route, and SQL m
     /await provisionRetailer\(\{[\s\S]*?\}\)[\s\S]*?await sendRetailerWelcomeEmail\(/,
   );
 
-  // Shifts action stops reminders when first shift is created
-  assert.match(shiftsAction, /markRetailerFirstShiftPosted\(resolved\.storeId\)/);
+  // Shifts action stops reminders when first shift is created (awaited before redirect)
+  assert.match(shiftsAction, /await markRetailerFirstShiftPosted\(resolved\.storeId\)/);
+  assert.doesNotMatch(shiftsAction, /void markRetailerFirstShiftPosted/);
+
+  // Auth action logs result.error ?? result.reason ?? "unknown error"
+  assert.match(
+    authAction,
+    /result\.error \?\? result\.reason \?\? "unknown error"/,
+  );
 
   // Cron route enforces CRON_SECRET and calls runRetailerReminderJob
   assert.match(cronRoute, /process\.env\.CRON_SECRET/);
@@ -658,4 +666,64 @@ test("12. Source integration: auth signup, shift creation, cron route, and SQL m
     migrationSql,
     /alter table public\.retailer_onboarding_reminders enable row level security/i,
   );
+});
+
+test("13. Production email URL resolution never uses localhost and Super Admin Communications includes all email workflows", async () => {
+  const prevNodeEnv = process.env.NODE_ENV;
+  const prevSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const prevVercelProd = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+
+    // Even if NEXT_PUBLIC_SITE_URL or siteUrl param is localhost in production, it resolves to https://shiftsupport.net
+    assert.equal(normaliseSiteUrl("http://localhost:3000"), "https://shiftsupport.net");
+    assert.equal(normaliseSiteUrl(null), "https://shiftsupport.net");
+
+    const workerWelcome = buildWorkerWelcomeEmail({ siteUrl: "http://localhost:3000" });
+    assert.ok(!workerWelcome.html.includes("localhost"));
+    assert.ok(!workerWelcome.text.includes("localhost"));
+    assert.ok(workerWelcome.html.includes("https://shiftsupport.net/worker/dashboard"));
+
+    const retailerWelcome = buildRetailerWelcomeEmail({ siteUrl: "http://localhost:3000" });
+    assert.ok(!retailerWelcome.html.includes("localhost"));
+    assert.ok(!retailerWelcome.text.includes("localhost"));
+    assert.ok(retailerWelcome.html.includes("https://shiftsupport.net/retailer/shifts/new"));
+
+    const reminderEmail = buildRetailerReminderEmail({
+      fullName: "Sam Verhoeven",
+      siteUrl: "http://localhost:3000",
+    });
+    assert.ok(!reminderEmail.html.includes("localhost"));
+    assert.ok(!reminderEmail.text.includes("localhost"));
+    assert.ok(reminderEmail.html.includes("https://shiftsupport.net/retailer/shifts/new"));
+  } finally {
+    process.env.NODE_ENV = prevNodeEnv;
+    if (prevSiteUrl === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+    else process.env.NEXT_PUBLIC_SITE_URL = prevSiteUrl;
+    if (prevVercelProd === undefined) delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    else process.env.VERCEL_PROJECT_PRODUCTION_URL = prevVercelProd;
+  }
+
+  const [commsPage, siteHelper] = await Promise.all([
+    readFile(
+      new URL(
+        "../app/super-admin/(console)/communications/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../lib/site.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(commsPage, /from\("email_workflow_deliveries"\)/);
+  assert.match(commsPage, /from\("retailer_invoice_email_logs"\)/);
+  assert.match(commsPage, /Worker Welcome Email/);
+  assert.match(commsPage, /Retailer Welcome Email/);
+  assert.match(commsPage, /14-Day Retailer Reminder/);
+  assert.match(commsPage, /Retailer Invoice Email/);
+  assert.match(siteHelper, /isLocalhostOrigin/);
+  assert.match(siteHelper, /PRODUCTION_SITE_URL_FALLBACK/);
 });
