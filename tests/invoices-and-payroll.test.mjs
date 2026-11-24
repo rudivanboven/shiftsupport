@@ -713,3 +713,52 @@ test("12. PDF multi-line wrapping & dynamic layout: shows complete demo and long
     `Calculation note (${calculationY}) must stay above Footer (${footerThankYouY})`,
   );
 });
+
+test("13. Super Admin Invoice Listing redesign: summary cards, wide columns without narrow Actions column, and full-width bottom action panel", async () => {
+  const [invoicesPage, invoiceActions, adminCss] = await Promise.all([
+    readFile(
+      new URL(
+        "../app/super-admin/(console)/invoices/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../components/super-admin/InvoiceActions.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/super-admin/Admin.module.css", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  // 1. Summary cards use real computed values
+  assert.match(invoicesPage, /label="Total Generated Invoices"/);
+  assert.match(invoicesPage, /label="Total Invoiced Amount"/);
+  assert.match(invoicesPage, /label="Total Emails Sent"/);
+  assert.match(invoicesPage, /label="Pending Emails"/);
+
+  // 2. Narrow far-right Actions table header column is removed
+  assert.doesNotMatch(invoicesPage, /<th>Actions<\/th>/);
+  assert.doesNotMatch(invoicesPage, /<th>Action<\/th>/);
+
+  // 3. Card container and full-width bottom action panel below invoice data row
+  assert.match(invoicesPage, /styles\.invoiceCard/);
+  assert.match(invoicesPage, /styles\.invoiceCardHeader/);
+  assert.match(invoicesPage, /styles\.invoiceDataTable/);
+  assert.match(invoicesPage, /styles\.invoiceActionFooter/);
+
+  // 4. All four action buttons exist with Send Email styled as primary green button
+  assert.match(invoiceActions, /View Invoice/);
+  assert.match(invoiceActions, /Preview PDF/);
+  assert.match(invoiceActions, /Download PDF/);
+  assert.match(invoiceActions, /Send Email/);
+  assert.match(invoiceActions, /styles\.invoiceBtnPrimary/);
+  assert.match(invoiceActions, /styles\.invoiceBtnSecondary/);
+  assert.match(adminCss, /\.invoiceActionFooter\s*\{/);
+  assert.match(adminCss, /\.invoiceBtnPrimary\s*\{/);
+});

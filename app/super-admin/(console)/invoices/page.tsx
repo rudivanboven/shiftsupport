@@ -34,22 +34,70 @@ const PATH = "/super-admin/invoices";
 
 const INVOICE_STATUS_BADGE: Record<
   string,
-  { label: string; tone: "approved" | "open" | "pending" | "cancelled" | "neutral" }
+  {
+    label: string;
+    tone: "approved" | "open" | "pending" | "cancelled" | "neutral";
+    pillClass: string;
+  }
 > = {
-  generated: { label: "GENERATED", tone: "open" },
-  sent: { label: "SENT", tone: "approved" },
-  paid: { label: "PAID", tone: "approved" },
-  void: { label: "VOID", tone: "cancelled" },
+  generated: {
+    label: "GENERATED",
+    tone: "open",
+    pillClass: styles.invoiceStatusGenerated,
+  },
+  sent: {
+    label: "SENT",
+    tone: "approved",
+    pillClass: styles.invoiceStatusSent,
+  },
+  paid: {
+    label: "PAID",
+    tone: "approved",
+    pillClass: styles.invoiceStatusPaid,
+  },
+  void: {
+    label: "VOID",
+    tone: "cancelled",
+    pillClass: styles.invoiceStatusVoid,
+  },
 };
 
 const EMAIL_STATUS_BADGE: Record<
   string,
   { label: string; tone: "approved" | "pending" | "cancelled" | "neutral" }
 > = {
-  not_sent: { label: "Not sent", tone: "neutral" },
-  sent: { label: "Email sent", tone: "approved" },
-  failed: { label: "Failed", tone: "cancelled" },
+  not_sent: { label: "Pending Email", tone: "pending" },
+  sent: { label: "Email Sent", tone: "approved" },
+  failed: { label: "Email Failed", tone: "cancelled" },
 };
+
+const IconInvoiceCount = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5.5 2.8h6.3l3.7 3.7v10.3a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V3.8a1 1 0 0 1 1-1Z" />
+    <path d="M11.6 2.9v3.8h3.8M7.3 10.2h5.4M7.3 13.2h3.8" />
+  </svg>
+);
+
+const IconTotalAmount = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10 2.6v14.8" />
+    <path d="M13.2 6.1c0-1.3-1.4-2.2-3.2-2.2s-3.2.9-3.2 2.2c0 2.6 6.4 1.6 6.4 4.4 0 1.4-1.4 2.4-3.2 2.4s-3.2-1-3.2-2.4" />
+  </svg>
+);
+
+const IconEmailSent = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2.5" y="4.2" width="15" height="11.6" rx="2" />
+    <path d="m3.3 5.2 6.7 5.1 6.7-5.1" />
+  </svg>
+);
+
+const IconPendingEmail = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="10" cy="10" r="7.4" />
+    <path d="M10 6v4.3l2.8 1.7" />
+  </svg>
+);
 
 export default async function SuperAdminInvoicesPage({
   searchParams,
@@ -103,7 +151,7 @@ export default async function SuperAdminInvoicesPage({
         },
         store: store
           ? {
-              id: store.id,
+               id: store.id,
               name: store.name,
               address: store.address,
               contactPhone: store.contact_phone,
@@ -151,6 +199,8 @@ export default async function SuperAdminInvoicesPage({
         inv.invoiceNumber,
         inv.retailerName,
         inv.storeName,
+        inv.storeAddress,
+        inv.contactPersonName,
         inv.contactEmail,
         inv.shiftTaskType,
       )
@@ -186,8 +236,11 @@ export default async function SuperAdminInvoicesPage({
     return true;
   });
 
+  // Real database summary metrics
+  const totalGeneratedInvoices = invoices.length;
   const totalBilledCents = invoices.reduce((sum, inv) => sum + inv.totalCents, 0);
-  const emailedCount = invoices.filter((inv) => inv.emailStatus === "sent").length;
+  const totalEmailsSentCount = invoices.filter((inv) => inv.emailStatus === "sent").length;
+  const pendingEmailsCount = invoices.filter((inv) => inv.emailStatus !== "sent").length;
   const readyToGenerateCount = completedShifts.filter(
     (row) => row.validation.eligible && !row.existingInvoice,
   ).length;
@@ -222,26 +275,46 @@ export default async function SuperAdminInvoicesPage({
       ) : null}
 
       <Metrics tone="finance">
-        <Metric label="Invoices generated" value={invoices.length} />
         <Metric
-          label="Total invoiced amount"
+          label="Total Generated Invoices"
+          value={totalGeneratedInvoices}
+          icon={<IconInvoiceCount />}
+          hint={
+            readyToGenerateCount > 0
+              ? `${readyToGenerateCount} completed shift${readyToGenerateCount === 1 ? "" : "s"} ready to invoice`
+              : `${completedShifts.length} completed shift${completedShifts.length === 1 ? "" : "s"} tracked`
+          }
+        />
+        <Metric
+          label="Total Invoiced Amount"
           value={money(totalBilledCents)}
+          icon={<IconTotalAmount />}
           hint="Approved hours × retailer billing rate"
         />
-        <Metric label="Invoices emailed" value={emailedCount} />
         <Metric
-          label="Eligible shifts awaiting invoice"
-          value={readyToGenerateCount}
-          hint={`${completedShifts.length} completed shifts total`}
+          label="Total Emails Sent"
+          value={totalEmailsSentCount}
+          icon={<IconEmailSent />}
+          hint="Delivered to retailer billing contacts"
+        />
+        <Metric
+          label="Pending Emails"
+          value={pendingEmailsCount}
+          icon={<IconPendingEmail />}
+          hint={
+            pendingEmailsCount === 0
+              ? "All generated invoices have been emailed"
+              : "Generated invoices awaiting email dispatch"
+          }
         />
       </Metrics>
 
       <div className={`${styles.presets} ${styles.tabRow}`}>
         {[
-          { key: "invoices", label: `Invoices (${invoices.length})` },
+          { key: "invoices", label: `Generated Invoices (${invoices.length})` },
           {
             key: "completed-shifts",
-            label: `Completed shifts (${completedShifts.length})`,
+            label: `Completed Shifts (${completedShifts.length})`,
           },
         ].map((item) => (
           <Link
@@ -259,7 +332,7 @@ export default async function SuperAdminInvoicesPage({
           value={params.q}
           placeholder={
             tab === "invoices"
-              ? "Invoice #, retailer, store or task"
+              ? "Invoice #, retailer, store, address or task"
               : "Store, worker or shift task"
           }
         />
@@ -270,9 +343,10 @@ export default async function SuperAdminInvoicesPage({
             value={params.status}
             options={[
               { value: "", label: "Any" },
-              { value: "generated", label: "Generated" },
-              { value: "sent", label: "Sent" },
-              { value: "paid", label: "Paid" },
+              { value: "generated", label: "GENERATED" },
+              { value: "sent", label: "SENT" },
+              { value: "paid", label: "PAID" },
+              { value: "void", label: "VOID" },
             ]}
           />
         ) : null}
@@ -282,7 +356,7 @@ export default async function SuperAdminInvoicesPage({
       {tab === "invoices" ? (
         <Panel
           title="Generated invoices"
-          description="One unique invoice per completed shift. Resending an invoice emails the existing PDF without creating a duplicate invoice number."
+          description="One unique invoice per completed shift. Each invoice displays its full retailer and shift financial summary above a dedicated action bar."
           flush
         >
           {rows.length === 0 ? (
@@ -290,118 +364,185 @@ export default async function SuperAdminInvoicesPage({
               title="No invoices found"
               text={
                 invoices.length === 0
-                  ? "Switch to the Completed shifts tab above to generate your first retailer invoice."
+                  ? "Switch to the Completed Shifts tab above to generate your first retailer invoice."
                   : "No invoices match the current filter."
               }
             />
           ) : (
             <>
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Invoice Number</th>
-                      <th>Retailer Name</th>
-                      <th>Store Name</th>
-                      <th>Shift Date</th>
-                      <th className={styles.num}>Hours &amp; Rate</th>
-                      <th className={styles.num}>Invoice Amount</th>
-                      <th>Invoice Status</th>
-                      <th>Created Date</th>
-                      <th>Email Sending Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(rows as typeof filteredInvoices).map((inv) => {
-                      const invBadge = INVOICE_STATUS_BADGE[inv.invoiceStatus] ?? {
-                        label: inv.invoiceStatus,
-                        tone: "neutral" as const,
-                      };
-                      const emailBadge = EMAIL_STATUS_BADGE[inv.emailStatus] ?? {
-                        label: inv.emailStatus,
-                        tone: "neutral" as const,
-                      };
+              <div className={styles.invoiceCardList}>
+                {(rows as typeof filteredInvoices).map((inv) => {
+                  const invBadge = INVOICE_STATUS_BADGE[inv.invoiceStatus] ?? {
+                    label: inv.invoiceStatus.toUpperCase(),
+                    tone: "neutral" as const,
+                    pillClass: styles.invoiceStatusGenerated,
+                  };
+                  const emailBadge = EMAIL_STATUS_BADGE[inv.emailStatus] ?? {
+                    label: inv.emailStatus,
+                    tone: "neutral" as const,
+                  };
 
-                      return (
-                        <tr key={inv.id}>
-                          <td className={styles.nowrap}>
-                            <Link
-                              className={styles.primaryCell}
-                              href={`/super-admin/invoices/${inv.id}`}
-                            >
-                              #{inv.invoiceNumber}
-                            </Link>
-                            <span className={styles.sub}>{inv.shiftTaskType}</span>
-                          </td>
-                          <td>
-                            {inv.contactPersonName ?? inv.retailerName}
-                            <span className={styles.sub}>{inv.contactEmail ?? "No email"}</span>
-                          </td>
-                          <td>
-                            <Link
-                              className={styles.primaryCell}
-                              href={`/super-admin/retailers/${inv.storeId}`}
-                            >
-                              {inv.storeName}
-                            </Link>
-                            {inv.storeAddress ? (
-                              <span className={styles.sub}>{inv.storeAddress}</span>
-                            ) : null}
-                          </td>
-                          <td className={styles.nowrap}>
-                            {formatDate(inv.shiftDate)}
-                            <span className={styles.sub}>
-                              <Link href={`/super-admin/shifts/${inv.shiftId}`}>View shift</Link>
-                            </span>
-                          </td>
-                          <td className={styles.num}>
-                            {hoursText(inv.approvedHours)}
-                            <span className={styles.sub}>${inv.hourlyRate}/hr</span>
-                          </td>
-                          <td className={styles.num}>
-                            <strong>{money(inv.totalCents)}</strong>
-                            <span className={styles.sub}>{inv.currency}</span>
-                          </td>
-                          <td>
-                            <Badge tone={invBadge.tone}>{invBadge.label}</Badge>
-                          </td>
-                          <td className={styles.nowrap}>{formatDateTime(inv.createdAt)}</td>
-                          <td>
-                            <Badge tone={emailBadge.tone}>{emailBadge.label}</Badge>
-                            {inv.emailSentAt ? (
-                              <span className={styles.sub}>
-                                {formatDateTime(inv.emailSentAt)}
-                                {inv.emailSendCount > 1 ? ` (${inv.emailSendCount}×)` : ""}
-                              </span>
-                            ) : null}
-                            {inv.emailLastError ? (
-                              <span className={`${styles.sub} ${styles.warnText}`}>
-                                {inv.emailLastError}
-                              </span>
-                            ) : null}
-                          </td>
-                          <td>
-                            <GenerateOrManageInvoiceActions
-                              shiftId={inv.shiftId}
-                              eligible
-                              existingInvoice={{
-                                id: inv.id,
-                                invoiceNumber: inv.invoiceNumber,
-                                invoiceStatus: inv.invoiceStatus,
-                                emailStatus: inv.emailStatus,
-                                emailSentAt: inv.emailSentAt,
-                                emailSendCount: inv.emailSendCount,
-                                contactEmail: inv.contactEmail,
-                              }}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                  return (
+                    <article key={inv.id} className={styles.invoiceCard}>
+                      {/* Top Header: Invoice Number, Shift Task, and Status Badges */}
+                      <div className={styles.invoiceCardHeader}>
+                        <div className={styles.invoiceCardTitleGroup}>
+                          <Link
+                            className={styles.invoiceNumberLink}
+                            href={`/super-admin/invoices/${inv.id}`}
+                          >
+                            Invoice #{inv.invoiceNumber}
+                          </Link>
+                          <span className={styles.invoiceTaskTag}>
+                            {inv.shiftTaskType}
+                          </span>
+                        </div>
+
+                        <div className={styles.invoiceCardBadges}>
+                          <span className={`${styles.invoiceStatusPill} ${invBadge.pillClass}`}>
+                            <span className={styles.invoiceStatusDot} aria-hidden="true" />
+                            {invBadge.label}
+                          </span>
+                          <Badge tone={emailBadge.tone}>{emailBadge.label}</Badge>
+                        </div>
+                      </div>
+
+                      {/* Middle Section: Wide, Readable Invoice Data Table (No Far-Right Actions Column) */}
+                      <div className={styles.invoiceTableWrap}>
+                        <table className={styles.invoiceDataTable}>
+                          <thead>
+                            <tr>
+                              <th className={styles.invoiceColRetailer}>Retailer Name</th>
+                              <th className={styles.invoiceColStore}>Store Name &amp; Address</th>
+                              <th className={styles.invoiceColShiftDate}>Shift Date</th>
+                              <th className={`${styles.invoiceColHours} ${styles.num}`}>
+                                Hours &amp; Rate
+                              </th>
+                              <th className={`${styles.invoiceColAmount} ${styles.num}`}>
+                                Invoice Amount
+                              </th>
+                              <th className={styles.invoiceColCreated}>
+                                Created &amp; Email Status
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td data-label="Retailer Name" className={styles.invoiceColRetailer}>
+                                <span className={styles.invoiceCellTitle}>
+                                  {inv.contactPersonName ?? inv.retailerName}
+                                </span>
+                                <span className={styles.invoiceCellMeta}>
+                                  {inv.contactEmail ?? "No email on file"}
+                                </span>
+                                {inv.contactPhone ? (
+                                  <span className={styles.invoiceCellMeta}>
+                                    {inv.contactPhone}
+                                  </span>
+                                ) : null}
+                              </td>
+
+                              <td
+                                data-label="Store Name & Address"
+                                className={styles.invoiceColStore}
+                              >
+                                <Link
+                                  className={styles.invoiceCellTitle}
+                                  href={`/super-admin/retailers/${inv.storeId}`}
+                                >
+                                  {inv.storeName}
+                                </Link>
+                                <span className={styles.invoiceCellMeta}>
+                                  {inv.storeAddress ?? inv.shiftLocation ?? "Address not provided"}
+                                </span>
+                              </td>
+
+                              <td data-label="Shift Date" className={styles.invoiceColShiftDate}>
+                                <span className={styles.invoiceCellTitle}>
+                                  {formatDate(inv.shiftDate)}
+                                </span>
+                                <span className={styles.invoiceCellMeta}>
+                                  <Link href={`/super-admin/shifts/${inv.shiftId}`}>
+                                    View shift details →
+                                  </Link>
+                                </span>
+                              </td>
+
+                              <td
+                                data-label="Hours & Rate"
+                                className={`${styles.invoiceColHours} ${styles.num}`}
+                              >
+                                <span className={styles.invoiceCellTitle}>
+                                  {hoursText(inv.approvedHours)}
+                                </span>
+                                <span className={styles.invoiceCellMeta}>
+                                  ${Number(inv.hourlyRate).toFixed(2)}/hr
+                                </span>
+                              </td>
+
+                              <td
+                                data-label="Invoice Amount"
+                                className={`${styles.invoiceColAmount} ${styles.num}`}
+                              >
+                                <span className={styles.invoiceAmountValue}>
+                                  {money(inv.totalCents)}
+                                </span>
+                                <span className={styles.invoiceCellMeta}>
+                                  {inv.currency} · Approved hours
+                                </span>
+                              </td>
+
+                              <td
+                                data-label="Created & Email Status"
+                                className={styles.invoiceColCreated}
+                              >
+                                <span className={styles.invoiceCellTitle}>
+                                  {formatDateTime(inv.createdAt)}
+                                </span>
+                                <span className={styles.invoiceCellMeta}>
+                                  {inv.emailSentAt
+                                    ? `Sent ${formatDateTime(inv.emailSentAt)}${
+                                        inv.emailSendCount > 1
+                                          ? ` (${inv.emailSendCount}×)`
+                                          : ""
+                                      }`
+                                    : "Email not sent yet"}
+                                </span>
+                                {inv.emailLastError ? (
+                                  <span
+                                    className={`${styles.invoiceCellMeta} ${styles.warnText}`}
+                                  >
+                                    {inv.emailLastError}
+                                  </span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Bottom Full-Width Action Panel Directly Below Invoice Information Row */}
+                      <div className={styles.invoiceActionFooter}>
+                        <GenerateOrManageInvoiceActions
+                          shiftId={inv.shiftId}
+                          eligible
+                          showRecipientMeta
+                          existingInvoice={{
+                            id: inv.id,
+                            invoiceNumber: inv.invoiceNumber,
+                            invoiceStatus: inv.invoiceStatus,
+                            emailStatus: inv.emailStatus,
+                            emailSentAt: inv.emailSentAt,
+                            emailSendCount: inv.emailSendCount,
+                            contactEmail: inv.contactEmail,
+                          }}
+                        />
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
+
               <Pagination
                 path={PATH}
                 params={{ ...params, tab }}
@@ -425,156 +566,222 @@ export default async function SuperAdminInvoicesPage({
             />
           ) : (
             <>
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Shift</th>
-                      <th>Retailer / Store</th>
-                      <th>Worker</th>
-                      <th>Shift Date</th>
-                      <th className={styles.num}>Approved Hours</th>
-                      <th className={styles.num}>Rate</th>
-                      <th className={styles.num}>Invoice Total</th>
-                      <th>Invoice Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(rows as typeof filteredCompletedShifts).map(
-                      ({
-                        shift,
-                        store,
-                        contact,
-                        entry,
-                        worker,
-                        workerName,
-                        validation,
-                        existingInvoice,
-                      }) => {
-                        const rate = shift.hourly_rate ?? RETAILER_HOURLY_RATE;
-                        const approvedHours =
-                          entry?.approval_status === "approved"
-                            ? entry.approved_hours
-                            : null;
-                        const calculatedCents =
-                          approvedHours && approvedHours > 0
-                            ? Math.round(approvedHours * rate * 100)
-                            : null;
+              <div className={styles.invoiceCardList}>
+                {(rows as typeof filteredCompletedShifts).map(
+                  ({
+                    shift,
+                    store,
+                    contact,
+                    entry,
+                    worker,
+                    workerName,
+                    validation,
+                    existingInvoice,
+                  }) => {
+                    const rate = shift.hourly_rate ?? RETAILER_HOURLY_RATE;
+                    const approvedHours =
+                      entry?.approval_status === "approved"
+                        ? entry.approved_hours
+                        : null;
+                    const calculatedCents =
+                      approvedHours && approvedHours > 0
+                        ? Math.round(approvedHours * rate * 100)
+                        : null;
 
-                        return (
-                          <tr key={shift.id}>
-                            <td>
-                              <Link
-                                className={styles.primaryCell}
-                                href={`/super-admin/shifts/${shift.id}`}
-                              >
-                                {shift.task_type}
-                              </Link>
-                              <span className={styles.sub}>
-                                {shift.shift_location ?? store?.address ?? "—"}
+                    return (
+                      <article key={shift.id} className={styles.invoiceCard}>
+                        <div className={styles.invoiceCardHeader}>
+                          <div className={styles.invoiceCardTitleGroup}>
+                            <Link
+                              className={styles.invoiceNumberLink}
+                              href={`/super-admin/shifts/${shift.id}`}
+                            >
+                              {shift.task_type}
+                            </Link>
+                            {existingInvoice ? (
+                              <span className={styles.invoiceTaskTag}>
+                                Invoice #{existingInvoice.invoiceNumber}
                               </span>
-                            </td>
-                            <td>
-                              {store ? (
-                                <Link
-                                  className={styles.primaryCell}
-                                  href={`/super-admin/retailers/${store.id}`}
+                            ) : null}
+                          </div>
+
+                          <div className={styles.invoiceCardBadges}>
+                            {existingInvoice ? (
+                              <>
+                                <span
+                                  className={`${styles.invoiceStatusPill} ${styles.invoiceStatusGenerated}`}
                                 >
-                                  {store.name}
-                                </Link>
-                              ) : (
-                                "—"
-                              )}
-                              <span className={styles.sub}>
-                                {contact.name ?? contact.email ?? "No contact"}
-                              </span>
-                            </td>
-                            <td>
-                              {worker ? (
-                                <Link
-                                  className={styles.primaryCell}
-                                  href={`/super-admin/workers/${worker.id}`}
+                                  <span
+                                    className={styles.invoiceStatusDot}
+                                    aria-hidden="true"
+                                  />
+                                  {existingInvoice.invoiceStatus.toUpperCase()}
+                                </span>
+                                <Badge
+                                  tone={
+                                    existingInvoice.emailStatus === "sent"
+                                      ? "approved"
+                                      : "pending"
+                                  }
                                 >
-                                  {workerName ?? "Worker"}
-                                </Link>
-                              ) : (
-                                "—"
-                              )}
-                            </td>
-                            <td className={styles.nowrap}>
-                              {formatDate(shift.start_time)}
-                              <span className={styles.sub}>
-                                {formatTime(shift.start_time)}–{formatTime(shift.end_time)}
-                              </span>
-                            </td>
-                            <td className={styles.num}>
-                              {hoursText(approvedHours)}
-                              <span className={styles.sub}>
-                                sched {hoursText(shift.duration)}
-                              </span>
-                            </td>
-                            <td className={styles.num}>${rate}/hr</td>
-                            <td className={styles.num}>
-                              {existingInvoice
-                                ? money(existingInvoice.totalCents)
-                                : calculatedCents !== null
-                                  ? money(calculatedCents)
-                                  : "—"}
-                            </td>
-                            <td>
-                              {existingInvoice ? (
-                                <>
-                                  <Badge tone="approved">
-                                    #{existingInvoice.invoiceNumber}
-                                  </Badge>
-                                  <span className={styles.sub}>
-                                    {existingInvoice.emailStatus === "sent"
-                                      ? "Emailed to retailer"
-                                      : "Generated"}
+                                  {existingInvoice.emailStatus === "sent"
+                                    ? "Email Sent"
+                                    : "Pending Email"}
+                                </Badge>
+                              </>
+                            ) : validation.eligible ? (
+                              <Badge tone="open">Ready to Invoice</Badge>
+                            ) : (
+                              <Badge tone="pending">Awaiting Hours Approval</Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className={styles.invoiceTableWrap}>
+                          <table className={styles.invoiceDataTable}>
+                            <thead>
+                              <tr>
+                                <th className={styles.invoiceColRetailer}>
+                                  Retailer Contact
+                                </th>
+                                <th className={styles.invoiceColStore}>
+                                  Store &amp; Location
+                                </th>
+                                <th className={styles.invoiceColShiftDate}>Worker</th>
+                                <th className={styles.invoiceColShiftDate}>
+                                  Shift Date
+                                </th>
+                                <th
+                                  className={`${styles.invoiceColHours} ${styles.num}`}
+                                >
+                                  Approved Hours
+                                </th>
+                                <th
+                                  className={`${styles.invoiceColAmount} ${styles.num}`}
+                                >
+                                  Invoice Total
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td
+                                  data-label="Retailer Contact"
+                                  className={styles.invoiceColRetailer}
+                                >
+                                  <span className={styles.invoiceCellTitle}>
+                                    {contact.name ?? store?.name ?? "Retailer"}
                                   </span>
-                                </>
-                              ) : validation.eligible ? (
-                                <Badge tone="open">Ready to invoice</Badge>
-                              ) : (
-                                <>
-                                  <Badge tone="pending">Awaiting hours approval</Badge>
-                                  <span className={styles.sub}>
-                                    <Link href={`/super-admin/shifts/${shift.id}`}>
-                                      Record / approve hours →
+                                  <span className={styles.invoiceCellMeta}>
+                                    {contact.email ?? "No email"}
+                                  </span>
+                                </td>
+
+                                <td
+                                  data-label="Store & Location"
+                                  className={styles.invoiceColStore}
+                                >
+                                  {store ? (
+                                    <Link
+                                      className={styles.invoiceCellTitle}
+                                      href={`/super-admin/retailers/${store.id}`}
+                                    >
+                                      {store.name}
                                     </Link>
+                                  ) : (
+                                    <span className={styles.invoiceCellTitle}>—</span>
+                                  )}
+                                  <span className={styles.invoiceCellMeta}>
+                                    {shift.shift_location ?? store?.address ?? "—"}
                                   </span>
-                                </>
-                              )}
-                            </td>
-                            <td>
-                              <GenerateOrManageInvoiceActions
-                                shiftId={shift.id}
-                                eligible={validation.eligible}
-                                ineligibleReason={
-                                  validation.eligible ? undefined : validation.reason
-                                }
-                                existingInvoice={
-                                  existingInvoice
-                                    ? {
-                                        id: existingInvoice.id,
-                                        invoiceNumber: existingInvoice.invoiceNumber,
-                                        invoiceStatus: existingInvoice.invoiceStatus,
-                                        emailStatus: existingInvoice.emailStatus,
-                                        emailSentAt: existingInvoice.emailSentAt,
-                                        emailSendCount: existingInvoice.emailSendCount,
-                                        contactEmail: existingInvoice.contactEmail,
-                                      }
-                                    : null
-                                }
-                              />
-                            </td>
-                          </tr>
-                        );
-                      },
-                    )}
-                  </tbody>
-                </table>
+                                </td>
+
+                                <td
+                                  data-label="Worker"
+                                  className={styles.invoiceColShiftDate}
+                                >
+                                  {worker ? (
+                                    <Link
+                                      className={styles.invoiceCellTitle}
+                                      href={`/super-admin/workers/${worker.id}`}
+                                    >
+                                      {workerName ?? "Worker"}
+                                    </Link>
+                                  ) : (
+                                    <span className={styles.invoiceCellTitle}>—</span>
+                                  )}
+                                </td>
+
+                                <td
+                                  data-label="Shift Date"
+                                  className={styles.invoiceColShiftDate}
+                                >
+                                  <span className={styles.invoiceCellTitle}>
+                                    {formatDate(shift.start_time)}
+                                  </span>
+                                  <span className={styles.invoiceCellMeta}>
+                                    {formatTime(shift.start_time)}–
+                                    {formatTime(shift.end_time)}
+                                  </span>
+                                </td>
+
+                                <td
+                                  data-label="Approved Hours"
+                                  className={`${styles.invoiceColHours} ${styles.num}`}
+                                >
+                                  <span className={styles.invoiceCellTitle}>
+                                    {hoursText(approvedHours)}
+                                  </span>
+                                  <span className={styles.invoiceCellMeta}>
+                                    ${rate}/hr (sched {hoursText(shift.duration)})
+                                  </span>
+                                </td>
+
+                                <td
+                                  data-label="Invoice Total"
+                                  className={`${styles.invoiceColAmount} ${styles.num}`}
+                                >
+                                  <span className={styles.invoiceAmountValue}>
+                                    {existingInvoice
+                                      ? money(existingInvoice.totalCents)
+                                      : calculatedCents !== null
+                                        ? money(calculatedCents)
+                                        : "—"}
+                                  </span>
+                                  <span className={styles.invoiceCellMeta}>USD</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className={styles.invoiceActionFooter}>
+                          <GenerateOrManageInvoiceActions
+                            shiftId={shift.id}
+                            eligible={validation.eligible}
+                            showRecipientMeta={Boolean(existingInvoice)}
+                            ineligibleReason={
+                              validation.eligible ? undefined : validation.reason
+                            }
+                            existingInvoice={
+                              existingInvoice
+                                ? {
+                                    id: existingInvoice.id,
+                                    invoiceNumber: existingInvoice.invoiceNumber,
+                                    invoiceStatus: existingInvoice.invoiceStatus,
+                                    emailStatus: existingInvoice.emailStatus,
+                                    emailSentAt: existingInvoice.emailSentAt,
+                                    emailSendCount: existingInvoice.emailSendCount,
+                                    contactEmail: existingInvoice.contactEmail,
+                                  }
+                                : null
+                            }
+                          />
+                        </div>
+                      </article>
+                    );
+                  },
+                )}
               </div>
               <Pagination
                 path={PATH}
